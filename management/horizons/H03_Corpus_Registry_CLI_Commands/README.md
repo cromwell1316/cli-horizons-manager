@@ -2,10 +2,10 @@
 
 Owner: agent-toolchain
 Source of Truth: management/horizons/H03_Corpus_Registry_CLI_Commands/README.md
-Lifecycle: planned
+Lifecycle: completed
 Document Class: horizon
 
-Status: planned (Wave 2).
+Status: implemented (Wave 2).
 
 ## Purpose
 
@@ -31,9 +31,19 @@ Expose corpus registry inspection and management through the CLI.
 
 ## Owned Files (EXCLUSIVE)
 
-- `management/subprojects/horizon-manager/src/horizon_manager/cli.py`
-- `management/subprojects/horizon-manager/tests/test_horizon_cli.py`
+- `src/horizon_manager/cli.py`
+- `tests/test_horizon_cli.py`
 
 ## Concurrency
 
 Wave 2. Needs: H02.
+
+## Completion Notes
+
+- `horizon-manager corpora` remains a backward-compatible alias for `corpora list`.
+- `horizon-manager corpora list` emits all registry rows with horizon counts and path
+  health.
+- `horizon-manager corpora doctor` fails deterministically when registry paths are
+  missing, non-directories, or empty horizon directories.
+- H03 introduces no registry mutation command; the CLI surface is read-only, so future
+  mutation commands must be explicit and independently reversible.

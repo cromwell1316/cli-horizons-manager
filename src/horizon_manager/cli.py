@@ -10,7 +10,7 @@ from pathlib import Path
 import sys
 from typing import Any, Callable, TextIO
 
-from .corpus import corpus_names, default_corpus, known_corpora, resolve_corpus
+from .corpus import HorizonCorpus, corpus_names, default_corpus, known_corpora, resolve_corpus, validate_corpus_paths
 
 
 class ExitCode(IntEnum):
@@ -91,7 +91,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    subparsers.add_parser("corpora", help="List configured horizon corpora.")
+    corpora = subparsers.add_parser("corpora", help="Inspect configured horizon corpora.")
+    corpora.add_argument("corpus_action", nargs="?", choices=("list", "doctor"), default="list", help="Registry action.")
 
     state = subparsers.add_parser("state", help="Parse horizon README state.")
     state.add_argument("--write", action="store_true", help="Write horizon_state.json.")
@@ -202,17 +203,43 @@ def _run_state(args: argparse.Namespace, ctx: CommandContext) -> CommandResult:
 
 
 def _run_corpora(args: argparse.Namespace, ctx: CommandContext) -> CommandResult:
-    del args
+    action = getattr(args, "corpus_action", "list")
     rows = []
-    for corpus in known_corpora():
-        payload = corpus.to_dict()
-        payload["exists"] = corpus.horizons_dir.exists()
-        payload["selected"] = corpus.horizons_dir == ctx.horizons_dir
+    corpora = known_corpora()
+    path_diagnostics = validate_corpus_paths(corpora)
+    diagnostics_by_corpus: dict[str, list[dict[str, str]]] = {}
+    for diagnostic in path_diagnostics:
+        diagnostics_by_corpus.setdefault(diagnostic.corpus, []).append(diagnostic.to_dict())
+    for corpus in corpora:
+        payload = _corpus_row(corpus, ctx)
+        payload["diagnostics"] = diagnostics_by_corpus.get(corpus.name, [])
+        payload["healthy"] = not payload["diagnostics"]
         rows.append(payload)
+    ok = not path_diagnostics
+    if action == "doctor":
+        return CommandResult(
+            ok,
+            "corpora",
+            data={
+                "action": "doctor",
+                "corpora": rows,
+                "diagnostic_count": len(path_diagnostics),
+                "diagnostics": [item.to_dict() for item in path_diagnostics],
+                "selected": str(ctx.horizons_dir),
+            },
+            message="corpus registry healthy" if ok else "corpus registry diagnostics found",
+            exit_code=ExitCode.SUCCESS if ok else ExitCode.VALIDATION_FAILURE,
+            diagnostics=tuple(f"{item.corpus}:{item.field}:{item.code}" for item in path_diagnostics),
+        )
     return CommandResult(
         True,
         "corpora",
-        data={"corpora": rows, "selected": str(ctx.horizons_dir)},
+        data={
+            "action": "list",
+            "corpora": rows,
+            "diagnostic_count": len(path_diagnostics),
+            "selected": str(ctx.horizons_dir),
+        },
         message=f"{len(rows)} corpora",
     )
 
@@ -379,6 +406,22 @@ def _run_delegated_stub(args: argparse.Namespace, ctx: CommandContext) -> Comman
         exit_code=ExitCode.VALIDATION_FAILURE,
         diagnostics=(f"delegate_not_ready:{horizon}",),
     )
+
+
+def _corpus_row(corpus: HorizonCorpus, ctx: CommandContext) -> dict[str, Any]:
+    payload = corpus.to_dict()
+    payload["exists"] = corpus.horizons_dir.exists()
+    payload["generated_dir_exists"] = corpus.generated_dir.exists()
+    payload["horizon_count"] = _horizon_count(corpus.horizons_dir)
+    payload["repo_root_exists"] = corpus.repo_root.exists()
+    payload["selected"] = corpus.name == ctx.corpus_name or corpus.horizons_dir == ctx.horizons_dir
+    return payload
+
+
+def _horizon_count(horizons_dir: Path) -> int:
+    if not horizons_dir.is_dir():
+        return 0
+    return sum(1 for _ in horizons_dir.glob("H[0-9][0-9]*/README.md"))
 
 
 def _context_from_args(args: argparse.Namespace) -> CommandContext:

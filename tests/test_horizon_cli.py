@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import tempfile
 
+from horizon_manager.corpus import HorizonCorpus
 from horizon_manager.cli import (
     CommandContext,
     CommandIO,
@@ -79,8 +80,59 @@ def test_corpora_command_lists_configured_external_corpora() -> None:
     result = run_command(args)
 
     assert result.ok is True
+    assert result.data["action"] == "list"
     names = [row["name"] for row in result.data["corpora"]]
     assert names == ["hco", "cli-profile-manager", "geoforge", "horizon-manager"]
+    assert all("horizon_count" in row for row in result.data["corpora"])
+    assert all("healthy" in row for row in result.data["corpora"])
+
+
+def test_corpora_list_action_is_explicit_alias() -> None:
+    args = build_parser().parse_args(["corpora", "list"])
+
+    result = run_command(args)
+
+    assert result.ok is True
+    assert result.data["action"] == "list"
+
+
+def test_corpora_doctor_reports_healthy_temp_registry(monkeypatch) -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        horizons = root / "management/horizons"
+        _write_readme(horizons, "H01", "Alpha", "implemented", 1, ())
+        corpus = HorizonCorpus("demo", "Demo", root, horizons, root / "management")
+        monkeypatch.setattr("horizon_manager.cli.known_corpora", lambda: (corpus,))
+        args = build_parser().parse_args(["corpora", "doctor"])
+
+        result = run_command(args, context=CommandContext(repo_root=root, horizons_dir=horizons, generated_dir=root / "management"))
+
+    assert result.ok is True
+    assert result.message == "corpus registry healthy"
+    assert result.data["action"] == "doctor"
+    assert result.data["diagnostic_count"] == 0
+    assert result.data["corpora"][0]["horizon_count"] == 1
+
+
+def test_corpora_doctor_reports_path_diagnostics(monkeypatch) -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        missing = root / "missing"
+        corpus = HorizonCorpus("missing", "Missing", missing, missing / "horizons", missing / "generated")
+        monkeypatch.setattr("horizon_manager.cli.known_corpora", lambda: (corpus,))
+        args = build_parser().parse_args(["corpora", "doctor"])
+
+        result = run_command(args, context=CommandContext(repo_root=root, horizons_dir=root / "horizons", generated_dir=root))
+
+    assert result.ok is False
+    assert result.exit_code is ExitCode.VALIDATION_FAILURE
+    assert result.message == "corpus registry diagnostics found"
+    assert result.diagnostics == (
+        "missing:generated_dir:missing_path",
+        "missing:horizons_dir:missing_path",
+        "missing:repo_root:missing_path",
+    )
+    assert result.data["diagnostic_count"] == 3
 
 
 def test_corpus_selection_sets_context_paths() -> None:
@@ -210,6 +262,7 @@ if __name__ == "__main__":
     test_text_output_uses_stderr_for_failures()
     test_state_command_parses_temp_horizon_tree()
     test_corpora_command_lists_configured_external_corpora()
+    test_corpora_list_action_is_explicit_alias()
     test_corpus_selection_sets_context_paths()
     test_claim_success_writes_lock_snapshot()
     test_claim_conflict_maps_to_conflict_exit_code()

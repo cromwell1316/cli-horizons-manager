@@ -15,5 +15,5 @@ Expose corpus registry inspection and management through the CLI.
 
 ## Owned Implementation Surface
 
-- management/subprojects/horizon-manager/src/horizon_manager/cli.py
-- management/subprojects/horizon-manager/tests/test_horizon_cli.py
+- src/horizon_manager/cli.py
+- tests/test_horizon_cli.py
