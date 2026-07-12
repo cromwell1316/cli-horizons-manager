@@ -27,7 +27,6 @@ CLR_DIM = "\033[90m"
 CLR_MUTED = "\033[38;5;245m"
 CLR_BG_BLACK = "\033[48;5;0m"
 _ANSI_RE = re.compile(r"\033\[[0-9;?]*[A-Za-z]")
-STATUS_LABEL_WIDTH = 8
 COMMAND_TITLES = {
     "next": "Overview / Next Horizons",
     "state": "Refresh State",
@@ -415,7 +414,7 @@ def _operator_status_summary(counts: dict[str, int]) -> str:
 
 
 def _status_line(label: str, value: str, *, label_color: str = CLR_WHITE) -> str:
-    return f"{label_color}{label:<{STATUS_LABEL_WIDTH}}:{CLR_RESET}{CLR_BG_BLACK} {value}"
+    return f"{label_color}{label}:{CLR_RESET}{CLR_BG_BLACK} {value}"
 
 
 def _compact_path(path: Any, *, max_width: int | None = None) -> str:
