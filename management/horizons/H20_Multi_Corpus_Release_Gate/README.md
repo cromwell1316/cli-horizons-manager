@@ -2,10 +2,10 @@
 
 Owner: agent-toolchain
 Source of Truth: management/horizons/H20_Multi_Corpus_Release_Gate/README.md
-Lifecycle: planned
+Lifecycle: completed
 Document Class: horizon
 
-Status: planned (Wave 9).
+Status: implemented (Wave 9).
 
 ## Purpose
 
@@ -13,9 +13,10 @@ Create the final release gate proving Horizon Manager is ready as an external mu
 
 ## Goals
 
-- Run full tests and corpus smoke checks.
-- Run Graphify, CRG, and ECC handoff gates.
-- Record final evidence and residual risks.
+- Run full tests and corpus smoke checks. Done; external corpus doctor diagnostics are
+  recorded as residual risks.
+- Run Graphify, CRG, and ECC handoff gates. Done.
+- Record final evidence and residual risks. Done in `V_03_Implementation_Evidence.md`.
 
 ## Files
 

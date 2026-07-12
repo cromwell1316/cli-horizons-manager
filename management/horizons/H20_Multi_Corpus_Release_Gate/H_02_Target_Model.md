@@ -12,6 +12,10 @@ Create the final release gate proving Horizon Manager is ready as an external mu
 - Corpus-scoped paths and generated outputs where runtime state is involved.
 - Backward compatibility for existing HCO corpus workflows unless explicitly superseded.
 - Clear diagnostics when required input is missing or unsafe.
+- Release readiness is proven by repeatable commands rather than manual inspection.
+- Managed-corpus diagnostics are reported without mutating those external corpora.
+- Residual risks are explicit and do not block the package release evidence from being
+  committed.
 
 ## Owned Implementation Surface
 

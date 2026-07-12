@@ -144,3 +144,14 @@ Before committing, inspect `git status --short` and stage only files owned by th
 current horizon. If generated output is deliberately part of a scoped task, use an
 explicit force-add and record that exception in the horizon evidence. Unrelated dirty
 files should remain unstaged and be treated as another operator's work.
+
+## Release Gate
+The current release gate is recorded in
+`management/horizons/H20_Multi_Corpus_Release_Gate/`. Horizon Manager is validated as
+an external multi-corpus application when the package tests, self-management corpus
+doctor, corpus registry doctor, multi-corpus parse smoke checks, Graphify refresh, CRG
+handoff, and ECC handoff all complete.
+
+External managed corpora can still contain their own horizon metadata diagnostics. Those
+diagnostics are reported as managed-corpus residual risks and are not fixed by this
+application repository unless a specific horizon owns that corpus.

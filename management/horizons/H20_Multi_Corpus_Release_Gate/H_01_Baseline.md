@@ -2,15 +2,19 @@
 
 Source of Truth: management/horizons/H20_Multi_Corpus_Release_Gate/README.md
 
-## Current State
+## Baseline State
 
-The current Horizon Manager implementation does not yet fully satisfy this horizon's target behavior. Existing tests may cover adjacent contracts, but this horizon requires focused implementation evidence.
+Before H20, implementation horizons had landed across packaging, registry, CLI,
+interactive UX, hooks, preflight, land, rendering, daemon/watch, worktree hygiene, and
+operator feedback. The project still needed one consolidated release gate documenting
+package tests, corpus smoke checks, handoff gates, and residual external-corpus risks.
 
-## Known Gaps
+## Closed Gaps
 
-- The implementation needs corpus-aware behavior where applicable.
-- Operator output must be deterministic and script-friendly.
-- Tests must cover the owned files before the horizon can land.
+- Full package tests are recorded in implementation evidence.
+- All configured corpora are parsed by the external application.
+- Registry, self-management doctor, Graphify, CRG, and ECC handoff gates are recorded.
+- External corpus doctor failures are captured as residual managed-corpus risks.
 
 ## Baseline Checks
 
