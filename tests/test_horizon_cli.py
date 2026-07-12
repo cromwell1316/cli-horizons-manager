@@ -257,6 +257,52 @@ def test_events_command_reads_jsonl_tail() -> None:
     assert result.data["context"]["generated_dir"] == str(root)
 
 
+def test_render_command_writes_corpus_scoped_artifacts() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        horizons = root / "horizons"
+        generated = root / "management"
+        _write_readme(horizons, "H39", "State", "implemented", 7, ())
+        _write_readme(horizons, "H48", "Dashboard", "planned", 10, ("H39",))
+        parser = build_parser()
+        ctx = CommandContext(repo_root=root, corpus_name="horizon-manager", horizons_dir=horizons, generated_dir=generated, now="2026-07-12T00:00:00Z")
+
+        result = run_command(parser.parse_args(["--horizons-dir", str(horizons), "--generated-dir", str(generated), "render"]), context=ctx)
+
+        assert result.ok is True
+        assert result.data["targets"] == ["dashboard", "dag", "history"]
+        assert Path(result.data["artifacts"]["dashboard"]) == generated / "horizon_dashboard.html"
+        assert Path(result.data["artifacts"]["dag"]) == generated / "horizon_dependency_graph.html"
+        assert Path(result.data["artifacts"]["history"]).parent == generated / "horizon_snapshots"
+        assert f"{ctx.corpus_title} Mission Control" in (generated / "horizon_dashboard.html").read_text(encoding="utf-8")
+        assert f"{ctx.corpus_title} Dependency DAG" in (generated / "horizon_dependency_graph.html").read_text(encoding="utf-8")
+        snapshot = json.loads(Path(result.data["artifacts"]["history"]).read_text(encoding="utf-8"))
+        assert snapshot["metadata"]["corpus_title"] == ctx.corpus_title
+        assert snapshot["metadata"]["generated_dir"] == str(generated)
+
+
+def test_render_command_supports_single_target_output_override() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        horizons = root / "horizons"
+        generated = root / "management"
+        output = root / "custom.html"
+        _write_readme(horizons, "H39", "State", "implemented", 7, ())
+        parser = build_parser()
+        ctx = CommandContext(repo_root=root, horizons_dir=horizons, generated_dir=generated)
+
+        result = run_command(
+            parser.parse_args(["--horizons-dir", str(horizons), "--generated-dir", str(generated), "render", "--target", "dashboard", "--output", str(output)]),
+            context=ctx,
+        )
+
+        assert result.ok is True
+        assert result.data["targets"] == ["dashboard"]
+        assert Path(result.data["artifacts"]["dashboard"]) == output
+        assert output.exists()
+        assert not (generated / "horizon_dashboard.html").exists()
+
+
 def test_delegated_commands_return_validation_failure_until_modules_land() -> None:
     args = build_parser().parse_args(["preflight"])
     result = run_command(args, context=CommandContext(repo_root=Path(".")))

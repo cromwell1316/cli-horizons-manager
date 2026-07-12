@@ -77,6 +77,24 @@ def test_snapshot_serializes_deterministic_json(tmp_path: Path) -> None:
     assert '"snapshot_id":' in first_path.read_text(encoding="utf-8")
 
 
+def test_snapshot_preserves_corpus_metadata() -> None:
+    snapshot = build_snapshot(
+        state=_state(),
+        dashboard="<html>one</html>",
+        created_at="2026-07-12T00:00:00Z",
+        metadata={"corpus_title": "Demo Corpus", "generated_dir": "/tmp/demo/management"},
+    )
+    equivalent = build_snapshot(
+        state=_state(),
+        dashboard="<html>one</html>",
+        created_at="2026-07-12T00:00:00Z",
+        metadata={"generated_dir": "/tmp/demo/management", "corpus_title": "Demo Corpus"},
+    )
+
+    assert snapshot.metadata == {"corpus_title": "Demo Corpus", "generated_dir": "/tmp/demo/management"}
+    assert snapshot.to_dict() == equivalent.to_dict()
+
+
 def test_diff_reports_status_transition_and_start_now_changes() -> None:
     previous = build_snapshot(
         state=_state(status_h40="planned"),

@@ -80,6 +80,13 @@ def test_rendered_html_has_dynamic_svg_routing_and_theme_tokens() -> None:
     assert ':root[data-theme="dark"]' in html
 
 
+def test_rendered_html_uses_corpus_title_when_provided() -> None:
+    html = render_dag_html(build_dag_model(_fixture_state()), title="Demo Corpus Dependency DAG")
+
+    assert "<title>Demo Corpus Dependency DAG</title>" in html
+    assert "<h1>Demo Corpus Dependency DAG</h1>" in html
+
+
 def test_rendered_html_preserves_scroll_contract_and_cross_wave_style() -> None:
     html = render_dag_html(build_dag_model(_fixture_state()))
 

@@ -60,6 +60,7 @@ class CommandContext:
     horizons_dir: Path | None = None
     generated_dir: Path | None = None
     now: str = ""
+    corpus_title: str = field(init=False, default="")
     repo_root_overridden: bool = field(init=False, default=False)
     horizons_dir_overridden: bool = field(init=False, default=False)
     generated_dir_overridden: bool = field(init=False, default=False)
@@ -67,6 +68,7 @@ class CommandContext:
     def __post_init__(self) -> None:
         corpus = resolve_corpus(self.corpus_name)
         self.corpus_name = corpus.name
+        self.corpus_title = corpus.title
         self.repo_root_overridden = self.repo_root is not None
         self.horizons_dir_overridden = self.horizons_dir is not None
         self.generated_dir_overridden = self.generated_dir is not None
@@ -143,7 +145,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser("preflight", help="Delegate to H46 preflight when available.")
     subparsers.add_parser("land", help="Delegate to H47 safe-land when available.")
-    subparsers.add_parser("render", help="Delegate to H48 renderer when available.")
+    render = subparsers.add_parser("render", help="Render dashboard, DAG, and history artifacts.")
+    render.add_argument("--target", choices=("dashboard", "dag", "history", "all"), action="append", default=None, help="Render target. Repeatable; defaults to all.")
+    render.add_argument("--output", default=None, help="Output path for a single dashboard or DAG target.")
+    render.add_argument("--theme", choices=("auto", "light", "dark"), default="auto", help="Dashboard theme.")
+    render.add_argument("--snapshot-dir", default=None, help="Directory for history snapshots. Defaults below generated dir.")
 
     hook = subparsers.add_parser("hook", help="Run daemon-independent local horizon hook checks.")
     hook.add_argument("--mode", choices=("pre_commit", "pre_push", "manual"), default="manual")
@@ -169,7 +175,7 @@ def run_command(args: argparse.Namespace, io: CommandIO | None = None, context: 
         "hook": _run_hook,
         "preflight": _run_delegated_stub,
         "land": _run_delegated_stub,
-        "render": _run_delegated_stub,
+        "render": _run_render,
     }
     handler = handlers.get(args.command)
     if handler is None:
@@ -418,6 +424,74 @@ def _run_hook(args: argparse.Namespace, ctx: CommandContext) -> CommandResult:
     )
 
 
+def _run_render(args: argparse.Namespace, ctx: CommandContext) -> CommandResult:
+    from .conflicts import build_conflict_matrix
+    from .dag_render import build_dag_model, render_dag_html, write_dag
+    from .doctor import run_doctor
+    from .history import build_snapshot, summarize_since_last, write_snapshot
+    from .locks import LockStore
+    from .next import recommend_next
+    from .parser import parse_horizon_tree
+    from .render import build_dashboard_model, render_dashboard, write_dashboard
+
+    targets = _render_targets(args.target)
+    output_override = Path(args.output) if args.output else None
+    if output_override is not None and len(targets) != 1:
+        raise ValueError("--output can only be used with one render target")
+
+    state = parse_horizon_tree(ctx.horizons_dir)
+    doctor = run_doctor(state, repo_root=ctx.repo_root, generated_paths=_generated_files(ctx))
+    conflicts = build_conflict_matrix(state)
+    locks = LockStore(ctx.path("horizon_locks.json")).load()
+    next_report = recommend_next(state, doctor, conflicts, locks, now=ctx.now or None)
+    events = _read_event_rows(ctx.path("horizon_events.jsonl"))
+    artifacts: dict[str, str] = {}
+    counts: dict[str, int] = {}
+    dashboard_html = ""
+
+    if "dashboard" in targets or "history" in targets:
+        dashboard_model = build_dashboard_model(state, doctor, conflicts, locks, next_report, events)
+        dashboard_html = render_dashboard(dashboard_model, theme=args.theme, title=f"{ctx.corpus_title} Mission Control")
+        if "dashboard" in targets:
+            dashboard_path = output_override if output_override is not None else ctx.path("horizon_dashboard.html")
+            write_dashboard(dashboard_path, dashboard_html)
+            artifacts["dashboard"] = str(dashboard_path)
+            counts["dashboard_sections"] = len(dashboard_model.sections)
+
+    if "dag" in targets:
+        dag_model = build_dag_model(state, conflicts, locks)
+        dag_html = render_dag_html(dag_model, title=f"{ctx.corpus_title} Dependency DAG")
+        dag_path = output_override if output_override is not None else ctx.path("horizon_dependency_graph.html")
+        write_dag(dag_path, dag_html)
+        artifacts["dag"] = str(dag_path)
+        counts["dag_nodes"] = len(dag_model.nodes)
+        counts["dag_edges"] = len(dag_model.edges)
+
+    if "history" in targets:
+        snapshot_dir = Path(args.snapshot_dir) if args.snapshot_dir else ctx.path("horizon_snapshots")
+        snapshot = build_snapshot(
+            state=state,
+            conflicts=conflicts,
+            locks=locks,
+            recommendations=next_report,
+            events=events,
+            dashboard=dashboard_html,
+            created_at=ctx.now or None,
+            metadata={"corpus": ctx.corpus_name, "corpus_title": ctx.corpus_title, "generated_dir": str(ctx.generated_dir)},
+        )
+        changes = summarize_since_last(snapshot_dir, snapshot)
+        snapshot_path = write_snapshot(snapshot_dir, snapshot)
+        artifacts["history"] = str(snapshot_path)
+        counts["history_changes"] = int(changes.has_changes)
+
+    return CommandResult(
+        True,
+        "render",
+        data={"artifacts": artifacts, "counts": counts, "targets": list(targets)},
+        message=f"rendered {', '.join(targets)}",
+    )
+
+
 def _run_delegated_stub(args: argparse.Namespace, ctx: CommandContext) -> CommandResult:
     del ctx
     command = str(args.command)
@@ -477,6 +551,23 @@ def _context_from_args(args: argparse.Namespace) -> CommandContext:
 def _generated_files(ctx: CommandContext) -> tuple[str, ...]:
     assert ctx.generated_dir is not None
     return tuple(str(path.relative_to(ctx.repo_root)) if path.is_relative_to(ctx.repo_root) else str(path) for path in sorted(ctx.generated_dir.glob("horizon_*.json*")))
+
+
+def _render_targets(values: list[str] | None) -> tuple[str, ...]:
+    requested = tuple(values or ("all",))
+    if "all" in requested:
+        return ("dashboard", "dag", "history")
+    return tuple(dict.fromkeys(requested))
+
+
+def _read_event_rows(path: Path) -> tuple[dict[str, Any], ...]:
+    if not path.exists():
+        return ()
+    rows = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            rows.append(json.loads(line))
+    return tuple(rows)
 
 
 def _lock_failure_code(blockers: tuple[str, ...]) -> ExitCode:

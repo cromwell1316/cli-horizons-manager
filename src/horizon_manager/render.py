@@ -106,9 +106,10 @@ def build_dashboard_model(
     )
 
 
-def render_dashboard(model: DashboardModel | dict[str, Any], theme: str = "auto") -> str:
+def render_dashboard(model: DashboardModel | dict[str, Any], theme: str = "auto", title: str = "Horizon Mission Control") -> str:
     if theme not in THEMES:
         raise ValueError(f"unsupported theme: {theme!r}")
+    display_title = str(title or "Horizon Mission Control")
     model_dict = model.to_dict() if isinstance(model, DashboardModel) else _stable_value(model)
     html = [
         "<!doctype html>",
@@ -116,14 +117,14 @@ def render_dashboard(model: DashboardModel | dict[str, Any], theme: str = "auto"
         "<head>",
         '<meta charset="utf-8">',
         '<meta name="viewport" content="width=device-width, initial-scale=1">',
-        "<title>Horizon Mission Control</title>",
+        f"<title>{escape(display_title)}</title>",
         "<style>",
         _css(),
         "</style>",
         "</head>",
         "<body>",
         '<main id="dashboard" class="dashboard">',
-        '<header class="topbar"><div><p class="eyebrow">Horizon Manager</p><h1>Horizon Mission Control</h1></div><button id="theme-toggle" type="button">Theme</button></header>',
+        f'<header class="topbar"><div><p class="eyebrow">Horizon Manager</p><h1>{escape(display_title)}</h1></div><button id="theme-toggle" type="button">Theme</button></header>',
         _overview_html(model_dict["overview"]),
         _board_html(model_dict["board"]),
         _table_section("next", "Next Recommendations", model_dict["next_recommendations"], ("rank", "horizon_id", "title", "explanation")),
@@ -158,9 +159,10 @@ def write_default_dashboard(
     events: Iterable[Any] | None = None,
     output_path: str | Path = DEFAULT_OUTPUT,
     theme: str = "auto",
+    title: str = "Horizon Mission Control",
 ) -> DashboardModel:
     model = build_dashboard_model(state, doctor, conflicts, locks, next_report, events)
-    write_dashboard(output_path, render_dashboard(model, theme=theme))
+    write_dashboard(output_path, render_dashboard(model, theme=theme, title=title))
     return model
 
 

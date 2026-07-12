@@ -2,10 +2,10 @@
 
 Owner: agent-toolchain
 Source of Truth: management/horizons/H11_Render_Dashboard_DAG_History_CLI_Wiring/README.md
-Lifecycle: planned
+Lifecycle: completed
 Document Class: horizon
 
-Status: planned (Wave 5).
+Status: implemented (Wave 5).
 
 ## Purpose
 
@@ -31,14 +31,24 @@ Replace the render CLI stub with real dashboard, DAG, and history render command
 
 ## Owned Files (EXCLUSIVE)
 
-- `management/subprojects/horizon-manager/src/horizon_manager/cli.py`
-- `management/subprojects/horizon-manager/src/horizon_manager/render.py`
-- `management/subprojects/horizon-manager/src/horizon_manager/dag_render.py`
-- `management/subprojects/horizon-manager/src/horizon_manager/history.py`
-- `management/subprojects/horizon-manager/tests/test_horizon_render.py`
-- `management/subprojects/horizon-manager/tests/test_horizon_dag_render.py`
-- `management/subprojects/horizon-manager/tests/test_horizon_history.py`
+- `src/horizon_manager/cli.py`
+- `src/horizon_manager/render.py`
+- `src/horizon_manager/dag_render.py`
+- `src/horizon_manager/history.py`
+- `tests/test_horizon_render.py`
+- `tests/test_horizon_dag_render.py`
+- `tests/test_horizon_history.py`
+
+## Owned Files (SHARED)
+
+- `tests/test_horizon_cli.py`
 
 ## Concurrency
 
 Wave 5. Needs: H06.
+
+## Completion Notes
+
+- `render` now supports dashboard, DAG, history, and all-target rendering.
+- Dashboard and DAG artifacts use the selected corpus title and selected generated directory.
+- History snapshots are written below the selected generated directory by default and include corpus metadata.

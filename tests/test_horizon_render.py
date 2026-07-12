@@ -43,6 +43,13 @@ def test_required_sections_render() -> None:
     assert "Blocked Horizons" in html
 
 
+def test_dashboard_uses_corpus_title_when_provided() -> None:
+    html = render_dashboard(_model(), title="Demo Corpus Mission Control")
+
+    assert "<title>Demo Corpus Mission Control</title>" in html
+    assert "<h1>Demo Corpus Mission Control</h1>" in html
+
+
 def test_no_external_assets_are_referenced() -> None:
     html = render_dashboard(_model())
     forbidden = ("https://", "http://", "<link", "<img", "@import", "src=")

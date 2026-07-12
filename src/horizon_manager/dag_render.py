@@ -163,7 +163,8 @@ def build_dag_model(state: HorizonState, conflicts: Any = None, locks: Any = Non
     )
 
 
-def render_dag_html(model: DagModel) -> str:
+def render_dag_html(model: DagModel, title: str = "Horizon Dependency DAG") -> str:
+    display_title = str(title or "Horizon Dependency DAG")
     payload = json.dumps(model.to_dict(), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     nodes = "\n".join(_render_node(node) for node in model.nodes)
     wave_headers = "\n".join(_render_wave_header(wave, model.layout.wave_counts[wave]) for wave in model.layout.columns)
@@ -173,7 +174,7 @@ def render_dag_html(model: DagModel) -> str:
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>HCO Horizon Dependency DAG</title>
+<title>{html.escape(display_title)}</title>
 <style>
 :root {{
   color-scheme: light;
@@ -306,7 +307,7 @@ button {{ border: 1px solid var(--line); background: var(--panel); color: var(--
 </head>
 <body>
 <div class="toolbar">
-  <div><h1>HCO Horizon Dependency DAG</h1><div class="meta">{len(model.nodes)} horizons · {len(model.edges)} dependencies · generated from canonical state</div></div>
+  <div><h1>{html.escape(display_title)}</h1><div class="meta">{len(model.nodes)} horizons · {len(model.edges)} dependencies · generated from canonical state</div></div>
   <button id="themeToggle" type="button">Theme: auto</button>
 </div>
 {legend}
