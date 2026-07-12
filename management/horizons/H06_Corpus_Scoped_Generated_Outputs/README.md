@@ -2,10 +2,10 @@
 
 Owner: agent-toolchain
 Source of Truth: management/horizons/H06_Corpus_Scoped_Generated_Outputs/README.md
-Lifecycle: planned
+Lifecycle: completed
 Document Class: horizon
 
-Status: planned (Wave 3).
+Status: implemented (Wave 3).
 
 ## Purpose
 
@@ -31,13 +31,28 @@ Make every generated output land beside the selected corpus instead of HCO-only 
 
 ## Owned Files (EXCLUSIVE)
 
-- `management/subprojects/horizon-manager/src/horizon_manager/parser.py`
-- `management/subprojects/horizon-manager/src/horizon_manager/conflicts.py`
-- `management/subprojects/horizon-manager/src/horizon_manager/locks.py`
-- `management/subprojects/horizon-manager/src/horizon_manager/render.py`
-- `management/subprojects/horizon-manager/src/horizon_manager/dag_render.py`
-- `management/subprojects/horizon-manager/src/horizon_manager/history.py`
+- `src/horizon_manager/parser.py`
+- `src/horizon_manager/conflicts.py`
+- `src/horizon_manager/locks.py`
+- `src/horizon_manager/render.py`
+- `src/horizon_manager/dag_render.py`
+- `src/horizon_manager/history.py`
+- `tests/test_horizon_model.py`
+- `tests/test_horizon_conflicts.py`
+- `tests/test_horizon_locks.py`
+- `tests/test_horizon_render.py`
+- `tests/test_horizon_dag_render.py`
+- `tests/test_horizon_history.py`
 
 ## Concurrency
 
 Wave 3. Needs: H04.
+
+## Completion Notes
+
+- Standalone module defaults now target this repository's `management/` directory and
+  `management/horizons` corpus.
+- HCO paths remain supported through explicit `--horizons-dir` and `--output`
+  arguments where module CLIs expose them.
+- Regression tests assert parser, conflicts, locks, dashboard, DAG, and history defaults
+  do not point at `hermes-consistency-orchestrator`.

@@ -15,9 +15,15 @@ Make every generated output land beside the selected corpus instead of HCO-only 
 
 ## Owned Implementation Surface
 
-- management/subprojects/horizon-manager/src/horizon_manager/parser.py
-- management/subprojects/horizon-manager/src/horizon_manager/conflicts.py
-- management/subprojects/horizon-manager/src/horizon_manager/locks.py
-- management/subprojects/horizon-manager/src/horizon_manager/render.py
-- management/subprojects/horizon-manager/src/horizon_manager/dag_render.py
-- management/subprojects/horizon-manager/src/horizon_manager/history.py
+- src/horizon_manager/parser.py
+- src/horizon_manager/conflicts.py
+- src/horizon_manager/locks.py
+- src/horizon_manager/render.py
+- src/horizon_manager/dag_render.py
+- src/horizon_manager/history.py
+- tests/test_horizon_model.py
+- tests/test_horizon_conflicts.py
+- tests/test_horizon_locks.py
+- tests/test_horizon_render.py
+- tests/test_horizon_dag_render.py
+- tests/test_horizon_history.py

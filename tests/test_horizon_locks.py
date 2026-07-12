@@ -6,6 +6,7 @@ import tempfile
 
 from horizon_manager.conflicts import build_conflict_matrix
 from horizon_manager.locks import (
+    DEFAULT_OUTPUT,
     HorizonLock,
     LockSnapshot,
     LockStatus,
@@ -27,6 +28,12 @@ from horizon_manager.model import (
 
 
 NOW = datetime(2026, 7, 11, 9, 30, tzinfo=UTC)
+
+
+def test_locks_default_output_is_standalone_management_path() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    assert DEFAULT_OUTPUT == project_root / "management/horizon_locks.json"
+    assert "hermes-consistency-orchestrator" not in DEFAULT_OUTPUT.as_posix()
 
 
 def test_successful_claim_records_owner_paths_and_ttl() -> None:

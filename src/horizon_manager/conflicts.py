@@ -12,7 +12,7 @@ from typing import Iterable
 from .model import HorizonId, HorizonRecord, HorizonState, OwnedPath, OwnedPathMode
 
 
-DEFAULT_OUTPUT = Path(__file__).resolve().parents[3] / "hermes-consistency-orchestrator/horizon_conflicts.json"
+DEFAULT_OUTPUT = Path(__file__).resolve().parents[2] / "management/horizon_conflicts.json"
 
 
 class ConflictKind(Enum):
@@ -368,7 +368,7 @@ def _normalize_path(path: str) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Generate HCO horizon conflict matrix JSON.")
+    parser = argparse.ArgumentParser(description="Generate horizon conflict matrix JSON.")
     parser.add_argument("--horizons-dir", default=None)
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT))
     parser.add_argument(

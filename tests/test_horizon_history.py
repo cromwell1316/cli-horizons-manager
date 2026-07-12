@@ -4,6 +4,7 @@ from pathlib import Path
 import tempfile
 
 from horizon_manager.history import (
+    DEFAULT_SNAPSHOT_DIR,
     build_snapshot,
     diff_snapshots,
     list_snapshots,
@@ -11,6 +12,12 @@ from horizon_manager.history import (
     summarize_since_last,
     write_snapshot,
 )
+
+
+def test_history_default_snapshot_dir_is_standalone_management_path() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    assert DEFAULT_SNAPSHOT_DIR == project_root / "management/horizon_snapshots"
+    assert "hermes-consistency-orchestrator" not in DEFAULT_SNAPSHOT_DIR.as_posix()
 
 
 def _state(status_h40: str = "planned", status_h41: str = "planned") -> dict:

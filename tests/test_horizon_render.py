@@ -17,7 +17,12 @@ from horizon_manager.events import EventType, HorizonEvent  # noqa: E402
 from horizon_manager.locks import HorizonLock, LockSnapshot, LockStatus  # noqa: E402
 from horizon_manager.model import HorizonDependency, HorizonRecord, HorizonState, HorizonStatus, OwnedPath, OwnedPathMode  # noqa: E402
 from horizon_manager.next import RecommendationReport  # noqa: E402
-from horizon_manager.render import build_dashboard_model, render_dashboard, write_dashboard  # noqa: E402
+from horizon_manager.render import DEFAULT_OUTPUT, build_dashboard_model, render_dashboard, write_dashboard  # noqa: E402
+
+
+def test_render_default_output_is_standalone_management_path() -> None:
+    assert DEFAULT_OUTPUT == PACKAGE_SRC.parent / "management/horizon_dashboard.html"
+    assert "hermes-consistency-orchestrator" not in DEFAULT_OUTPUT.as_posix()
 
 
 def test_dashboard_model_and_render_are_deterministic() -> None:

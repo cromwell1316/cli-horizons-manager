@@ -11,7 +11,7 @@ from typing import Any, Iterable
 
 
 SCHEMA_VERSION = 1
-DEFAULT_SNAPSHOT_DIR = Path(__file__).resolve().parents[3] / "hermes-consistency-orchestrator/horizon_snapshots"
+DEFAULT_SNAPSHOT_DIR = Path(__file__).resolve().parents[2] / "management/horizon_snapshots"
 
 
 @dataclass(frozen=True)

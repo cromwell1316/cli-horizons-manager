@@ -19,9 +19,10 @@ from .model import (
 )
 
 
-REPO_ROOT = Path(__file__).resolve().parents[5]
-DEFAULT_HORIZONS_DIR = REPO_ROOT / "management/subprojects/hermes-consistency-orchestrator/horizons"
-DEFAULT_OUTPUT = REPO_ROOT / "management/subprojects/hermes-consistency-orchestrator/horizon_state.json"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_GENERATED_DIR = REPO_ROOT / "management"
+DEFAULT_HORIZONS_DIR = DEFAULT_GENERATED_DIR / "horizons"
+DEFAULT_OUTPUT = DEFAULT_GENERATED_DIR / "horizon_state.json"
 
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
 _STATUS_RE = re.compile(r"^Status:\s*(.+?)\s*$", re.IGNORECASE | re.MULTILINE)
@@ -325,7 +326,7 @@ def _rel(path: Path, root: Path | None = None) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Generate canonical HCO horizon state JSON.")
+    parser = argparse.ArgumentParser(description="Generate canonical horizon state JSON.")
     parser.add_argument("--horizons-dir", default=str(DEFAULT_HORIZONS_DIR))
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT))
     args = parser.parse_args(argv)

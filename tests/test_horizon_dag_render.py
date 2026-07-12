@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 import tempfile
 
-from horizon_manager.dag_render import build_dag_model, render_dag_html, write_dag
+from horizon_manager.dag_render import DEFAULT_OUTPUT, build_dag_model, render_dag_html, write_dag
 from horizon_manager.model import (
     HorizonDependency,
     HorizonId,
@@ -15,6 +15,12 @@ from horizon_manager.model import (
     OwnedPath,
     OwnedPathMode,
 )
+
+
+def test_dag_default_output_is_standalone_management_path() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    assert DEFAULT_OUTPUT == project_root / "management/horizon_dependency_graph.html"
+    assert "hermes-consistency-orchestrator" not in DEFAULT_OUTPUT.as_posix()
 
 
 def test_dag_model_uses_state_nodes_and_dependency_edges() -> None:

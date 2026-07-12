@@ -12,7 +12,7 @@ from typing import Any
 from .model import HorizonId, HorizonRecord, HorizonState, HorizonStatus
 
 
-DEFAULT_OUTPUT = Path(__file__).resolve().parents[3] / "hermes-consistency-orchestrator/horizon_dependency_graph.html"
+DEFAULT_OUTPUT = Path(__file__).resolve().parents[2] / "management/horizon_dependency_graph.html"
 
 
 @dataclass(frozen=True, order=True)
@@ -465,7 +465,7 @@ def _stable_value(value: Any) -> Any:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Generate HCO horizon dependency DAG HTML.")
+    parser = argparse.ArgumentParser(description="Generate horizon dependency DAG HTML.")
     parser.add_argument("--horizons-dir", default=None)
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT))
     args = parser.parse_args(argv)

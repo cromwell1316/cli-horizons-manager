@@ -11,7 +11,7 @@ from typing import Any, Iterable
 from .model import HorizonId, HorizonRecord, HorizonState, HorizonStatus
 
 
-DEFAULT_OUTPUT = Path(__file__).resolve().parents[3] / "hermes-consistency-orchestrator/horizon_dashboard.html"
+DEFAULT_OUTPUT = Path(__file__).resolve().parents[2] / "management/horizon_dashboard.html"
 THEMES = frozenset({"auto", "light", "dark"})
 
 

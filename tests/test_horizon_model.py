@@ -13,7 +13,7 @@ PACKAGE_SRC = ROOT / "management/subprojects/horizon-manager/src"
 sys.path.insert(0, str(PACKAGE_SRC))
 
 from horizon_manager.model import HorizonId, HorizonState, HorizonStatus, OwnedPathMode  # noqa: E402
-from horizon_manager.parser import parse_horizon_tree, parse_readme  # noqa: E402
+from horizon_manager.parser import DEFAULT_HORIZONS_DIR, DEFAULT_OUTPUT, parse_horizon_tree, parse_readme  # noqa: E402
 
 
 def test_horizon_id_and_status_normalization() -> None:
@@ -23,6 +23,12 @@ def test_horizon_id_and_status_normalization() -> None:
     assert HorizonStatus.normalize("implemented (Wave 6, 2026-07-10)") is HorizonStatus.IMPLEMENTED
     assert HorizonStatus.normalize("in progress") is HorizonStatus.IN_PROGRESS
     assert HorizonStatus.normalize("") is HorizonStatus.UNKNOWN
+
+
+def test_parser_defaults_are_standalone_management_paths() -> None:
+    assert DEFAULT_HORIZONS_DIR == PACKAGE_SRC.parent / "management/horizons"
+    assert DEFAULT_OUTPUT == PACKAGE_SRC.parent / "management/horizon_state.json"
+    assert "hermes-consistency-orchestrator" not in DEFAULT_OUTPUT.as_posix()
 
 
 def test_model_serialization_is_deterministic() -> None:

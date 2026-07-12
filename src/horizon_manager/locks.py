@@ -17,7 +17,7 @@ from .conflicts import ConflictMatrix, ConflictSeverity
 from .model import HorizonId, HorizonState, HorizonStatus
 
 
-DEFAULT_OUTPUT = Path(__file__).resolve().parents[3] / "hermes-consistency-orchestrator/horizon_locks.json"
+DEFAULT_OUTPUT = Path(__file__).resolve().parents[2] / "management/horizon_locks.json"
 DEFAULT_TTL = timedelta(hours=2)
 
 

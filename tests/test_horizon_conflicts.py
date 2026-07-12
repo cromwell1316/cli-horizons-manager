@@ -14,6 +14,7 @@ sys.path.insert(0, str(PACKAGE_SRC))
 from horizon_manager.conflicts import (  # noqa: E402
     ConflictKind,
     ConflictSeverity,
+    DEFAULT_OUTPUT,
     build_conflict_matrix,
 )
 from horizon_manager.model import (  # noqa: E402
@@ -48,6 +49,11 @@ def test_write_write_overlap_blocks_pair() -> None:
     groups = json.loads(matrix.to_json())["compatible_groups"]
     assert all(not {"H41", "H42"} <= set(group) for group in groups)
     assert any("H43" in group for group in groups)
+
+
+def test_conflicts_default_output_is_standalone_management_path() -> None:
+    assert DEFAULT_OUTPUT == PACKAGE_SRC.parent / "management/horizon_conflicts.json"
+    assert "hermes-consistency-orchestrator" not in DEFAULT_OUTPUT.as_posix()
 
 
 def test_generated_artifact_overlap_blocks_pair() -> None:
