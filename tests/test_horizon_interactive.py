@@ -13,7 +13,7 @@ sys.path.insert(0, str(PACKAGE_SRC))
 
 from horizon_manager import cli  # noqa: E402
 from horizon_manager.cli import CommandContext, CommandResult  # noqa: E402
-from horizon_manager.interactive import _compact_path, _default_menu_runner, command_feedback_lines, operator_status_lines, render_menu_lines, run_interactive_main  # noqa: E402
+from horizon_manager.interactive import _compact_path, _default_menu_runner, _run_direct, command_feedback_lines, operator_status_lines, render_menu_lines, run_interactive_main  # noqa: E402
 
 ANSI_RE = re.compile(r"\033\[[0-9;?]*[A-Za-z]")
 
@@ -112,6 +112,24 @@ def test_command_feedback_summarizes_doctor_hook_and_preflight() -> None:
     assert command_feedback_lines(doctor) == ("summary: doctor blocked; diagnostics=1 errors=1 warnings=0",)
     assert command_feedback_lines(hook) == ("summary: hook blocked; changed=1 diagnostics=1 classifications=horizon-owned=1",)
     assert command_feedback_lines(preflight) == ("summary: preflight ok; checks=1 blockers=0 statuses=pass=1",)
+
+
+def test_run_direct_uses_clean_command_screen(monkeypatch, capsys) -> None:
+    calls = []
+
+    monkeypatch.setattr("horizon_manager.interactive.clear_screen", lambda: calls.append("clear"))
+    monkeypatch.setattr("horizon_manager.interactive.run_command", lambda args, context: CommandResult(True, "next", message="ok: next 1 recommendations"))
+    monkeypatch.setattr("horizon_manager.interactive.emit_result", lambda result, output_format: print(result.message))
+
+    result = _run_direct(["next", "--limit", "1"], CommandContext(corpus_name="horizon-manager"))
+
+    plain = ANSI_RE.sub("", capsys.readouterr().out)
+    assert result == 0
+    assert calls == ["clear"]
+    assert "HORIZON MANAGER COMMAND" in plain
+    assert "Command : Overview / Next Horizons" in plain
+    assert "Corpus  : horizon-manager" in plain
+    assert "ok: next 1 recommendations" in plain
 
 
 def test_interactive_corpus_selector_changes_context(monkeypatch, capsys) -> None:

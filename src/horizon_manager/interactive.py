@@ -28,6 +28,16 @@ CLR_MUTED = "\033[38;5;245m"
 CLR_BG_BLACK = "\033[48;5;0m"
 _ANSI_RE = re.compile(r"\033\[[0-9;?]*[A-Za-z]")
 STATUS_LABEL_WIDTH = 8
+COMMAND_TITLES = {
+    "next": "Overview / Next Horizons",
+    "state": "Refresh State",
+    "doctor": "Doctor",
+    "conflicts": "Conflicts",
+    "claim": "Claim Horizon",
+    "release": "Release Horizon",
+    "events": "Events",
+    "hook": "Hook Check",
+}
 
 
 MenuRunner = Callable[..., int]
@@ -68,6 +78,17 @@ def themed_screen_lines(lines: Sequence[str], width: int | None = None, height: 
     while len(themed) < height:
         themed.append(themed_line(width=width))
     return themed[:height]
+
+
+def themed_block_lines(lines: Sequence[str], width: int | None = None, top_padding: int = 1, left_padding: int | None = None) -> list[str]:
+    term_width = terminal_size()[0]
+    width = max(1, width or term_width)
+    if left_padding is None:
+        left_padding = 4 if width >= 100 else 2
+    left = " " * max(0, min(left_padding, max(0, width - 1)))
+    themed = [themed_line(width=width) for _ in range(max(0, top_padding))]
+    themed.extend(themed_line(left + str(line), width) for line in lines)
+    return themed
 
 
 def header_lines(title: str = "", width: int | None = None) -> list[str]:
@@ -178,9 +199,10 @@ def run_interactive_main(ctx: CommandContext | None = None, menu_runner: MenuRun
         elif selected == 1:
             _run_direct(["next", "--limit", "8"], context)
         elif selected == 2:
-            _run_direct(["state", "--write"], context)
-            _run_direct(["doctor", "--write"], context)
-            _run_direct(["conflicts", "--write"], context)
+            _show_command_screen(("refresh",), context, title="Refresh State + Doctor + Conflicts")
+            _run_direct(["state", "--write"], context, clear=False)
+            _run_direct(["doctor", "--write"], context, clear=False)
+            _run_direct(["conflicts", "--write"], context, clear=False)
         elif selected == 3:
             horizon = _prompt("Horizon id")
             agent = _prompt("Agent id", default="manual")
@@ -231,10 +253,13 @@ def _select_corpus(context: CommandContext, choose: MenuRunner) -> CommandContex
 
 
 def _show_help() -> None:
+    _show_command_screen(("help",), CommandContext(), title="Help")
     print(build_parser().format_help())
 
 
-def _run_direct(argv: list[str], context: CommandContext) -> int:
+def _run_direct(argv: list[str], context: CommandContext, *, clear: bool = True) -> int:
+    if clear:
+        _show_command_screen(argv, context)
     parser = build_parser()
     args = parser.parse_args(argv)
     result = run_command(args, context=context)
@@ -242,6 +267,24 @@ def _run_direct(argv: list[str], context: CommandContext) -> int:
     for line in command_feedback_lines(result):
         print(line)
     return int(result.exit_code)
+
+
+def _show_command_screen(argv: Sequence[str], context: CommandContext, *, title: str | None = None) -> None:
+    clear_screen()
+    command = title or _command_title(argv)
+    lines = [
+        *header_lines("COMMAND", width=min(terminal_size()[0], 56)),
+        "",
+        _status_line("Command", command),
+        _status_line("Corpus", f"{CLR_BRIGHT_RED}{context.corpus_name}{CLR_RESET}{CLR_BG_BLACK}{CLR_MUTED} - {context.corpus_title}{CLR_RESET}"),
+        "",
+    ]
+    print("\n".join(themed_block_lines(lines)))
+
+
+def _command_title(argv: Sequence[str]) -> str:
+    command = str(argv[0]) if argv else "Command"
+    return COMMAND_TITLES.get(command, " ".join(str(part) for part in argv) or "Command")
 
 
 def operator_status_lines(context: CommandContext) -> tuple[str, ...]:
