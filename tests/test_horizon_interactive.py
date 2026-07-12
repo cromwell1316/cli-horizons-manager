@@ -12,7 +12,7 @@ sys.path.insert(0, str(PACKAGE_SRC))
 
 from horizon_manager import cli  # noqa: E402
 from horizon_manager.cli import CommandContext, CommandResult  # noqa: E402
-from horizon_manager.interactive import _default_menu_runner, command_feedback_lines, operator_status_lines, render_menu_lines, run_interactive_main  # noqa: E402
+from horizon_manager.interactive import _compact_path, _default_menu_runner, command_feedback_lines, operator_status_lines, render_menu_lines, run_interactive_main  # noqa: E402
 
 
 def test_menu_lines_match_keyboard_first_surface() -> None:
@@ -20,6 +20,7 @@ def test_menu_lines_match_keyboard_first_surface() -> None:
 
     text = "\n".join(lines)
     assert "HORIZON MANAGER" in text
+    assert "Actions" in text
     assert "▌" in text
     assert "[1] Overview" in text
     assert "digits/shortcuts" in text
@@ -40,12 +41,14 @@ def test_default_menu_runner_shows_active_corpus(monkeypatch, capsys) -> None:
 
     output = capsys.readouterr().out
     assert selected == 8
-    assert "Active corpus:" in output
+    assert "Corpus:" in output
     assert "horizon-manager" in output
-    assert "Corpus state: horizons=" in output
-    assert "Locks: active=" in output
+    assert "Horizons:" in output
+    assert "Locks:" in output
+    assert "active=" in output
     assert "Doctor:" in output
     assert "Worktree:" in output
+    assert "Next:" in output
     assert "management/horizons" in output
 
 
@@ -55,8 +58,19 @@ def test_operator_status_lines_are_script_friendly(monkeypatch) -> None:
     lines = operator_status_lines(CommandContext(corpus_name="horizon-manager"))
 
     assert all("\n" not in line for line in lines)
-    assert any("Active corpus:" in line and "horizon-manager" in line for line in lines)
-    assert "Worktree: clean" in lines
+    assert any("Corpus:" in line and "horizon-manager" in line for line in lines)
+    assert any("Worktree:" in line and "clean" in line for line in lines)
+    assert any("Next:" in line and "Hook Check" in line for line in lines)
+
+
+def test_compact_path_preserves_tail_for_long_horizon_paths() -> None:
+    path = "/home/olivercromwell/projects/shared/GeoForge/management/subprojects/hermes-consistency-orchestrator/horizons"
+
+    compact = _compact_path(path, max_width=48)
+
+    assert len(compact) <= 48
+    assert compact.endswith("hermes-consistency-orchestrator/horizons")
+    assert "..." in compact
 
 
 def test_command_feedback_summarizes_doctor_hook_and_preflight() -> None:

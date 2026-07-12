@@ -6,6 +6,7 @@ import sys
 import termios
 import tty
 from collections.abc import Callable, Sequence
+from pathlib import Path
 import re
 import shutil
 import subprocess
@@ -23,6 +24,7 @@ CLR_DARK_RED = "\033[38;5;88m"
 CLR_CYAN = "\033[36m"
 CLR_WHITE = "\033[37m"
 CLR_DIM = "\033[90m"
+CLR_MUTED = "\033[38;5;245m"
 CLR_BG_BLACK = "\033[48;5;0m"
 _ANSI_RE = re.compile(r"\033\[[0-9;?]*[A-Za-z]")
 
@@ -86,16 +88,17 @@ def render_menu_lines(options: Sequence[str], title: str = "", selected_idx: int
     if pre_lines:
         lines.extend(str(line) for line in pre_lines)
         lines.append("")
+    lines.append(f"{CLR_DIM}Actions{CLR_RESET}")
     for idx, option in enumerate(options):
         if idx == selected_idx:
             lines.append(f"{CLR_BRIGHT_RED}▌{CLR_RESET} {CLR_BOLD}{CLR_WHITE}{option}{CLR_RESET}")
         else:
-            lines.append(f"  {CLR_DIM}{option}{CLR_RESET}")
+            lines.append(f"  {CLR_MUTED}{option}{CLR_RESET}")
     lines.append("")
     lines.append(
-        f"{CLR_DIM}↑/↓ move   digits/shortcuts   "
+        f"{CLR_MUTED}↑/↓ move   digits/shortcuts   "
         f"{CLR_BRIGHT_RED}Enter{CLR_RESET}{CLR_BG_BLACK}{CLR_DIM} select   "
-        f"{CLR_RED}Esc/q{CLR_RESET}{CLR_BG_BLACK}{CLR_DIM} back{CLR_RESET}"
+        f"{CLR_BRIGHT_RED}Esc/q{CLR_RESET}{CLR_BG_BLACK}{CLR_DIM} back{CLR_RESET}"
     )
     return themed_screen_lines(lines)
 
@@ -245,8 +248,9 @@ def operator_status_lines(context: CommandContext) -> tuple[str, ...]:
 
     lines = [
         f"{CLR_WHITE}Keyboard-first mission control for configured horizon corpora.{CLR_RESET}",
-        f"Active corpus: {CLR_BRIGHT_RED}{context.corpus_name}{CLR_RESET}{CLR_BG_BLACK}{CLR_DIM} - {context.corpus_title}{CLR_RESET}",
-        f"{CLR_DIM}Horizons:{CLR_RESET}{CLR_BG_BLACK} {context.horizons_dir}",
+        f"{CLR_DIM}Status{CLR_RESET}",
+        f"{CLR_WHITE}Corpus:{CLR_RESET}{CLR_BG_BLACK} {CLR_BRIGHT_RED}{context.corpus_name}{CLR_RESET}{CLR_BG_BLACK}{CLR_MUTED} - {context.corpus_title}{CLR_RESET}",
+        f"{CLR_WHITE}Horizons:{CLR_RESET}{CLR_BG_BLACK} {_compact_path(context.horizons_dir)}",
     ]
     try:
         from .doctor import run_doctor
@@ -254,20 +258,23 @@ def operator_status_lines(context: CommandContext) -> tuple[str, ...]:
         from .parser import parse_horizon_tree
 
         state = parse_horizon_tree(context.horizons_dir)
-        status_text = ", ".join(f"{key}={value}" for key, value in _status_counts(state.records).items()) or "none"
+        counts = _status_counts(state.records)
+        status_text = _operator_status_summary(counts)
         locks = LockStore(context.path("horizon_locks.json")).load()
         doctor = run_doctor(state, repo_root=context.repo_root, generated_paths=())
-        doctor_state = f"{CLR_BRIGHT_RED}ok{CLR_RESET}" if doctor.ok else f"{CLR_RED}errors{CLR_RESET}"
+        doctor_state = f"{CLR_BRIGHT_RED}ok{CLR_RESET}" if doctor.ok else f"{CLR_RED}blocked{CLR_RESET}"
         lines.extend(
             (
-                f"Corpus state: horizons={len(state.records)} statuses={status_text}",
-                f"Locks: active={len(locks.active_locks)} total={len(locks.locks)}",
-                f"Doctor: {doctor_state}{CLR_BG_BLACK} diagnostics={len(doctor.diagnostics)}{CLR_RESET}",
+                f"{CLR_WHITE}Horizons:{CLR_RESET}{CLR_BG_BLACK} total={len(state.records)} | {status_text}",
+                f"{CLR_WHITE}Locks:{CLR_RESET}{CLR_BG_BLACK} active={len(locks.active_locks)} | total={len(locks.locks)}",
+                f"{CLR_WHITE}Doctor:{CLR_RESET}{CLR_BG_BLACK} {doctor_state}{CLR_BG_BLACK} | diagnostics={len(doctor.diagnostics)}{CLR_RESET}",
             )
         )
     except Exception as exc:  # pragma: no cover - defensive operator surface
         lines.append(f"{CLR_RED}Corpus state unavailable:{CLR_RESET}{CLR_BG_BLACK} {exc}")
-    lines.append(f"Worktree: {_dirty_status(context)}")
+    worktree = _dirty_status(context)
+    lines.append(f"{CLR_WHITE}Worktree:{CLR_RESET}{CLR_BG_BLACK} {worktree}")
+    lines.append(f"{CLR_DIM}Next:{CLR_RESET}{CLR_BG_BLACK} {_next_action_hint(worktree)}")
     return tuple(lines)
 
 
@@ -328,6 +335,31 @@ def _status_counts(records: Sequence[Any]) -> dict[str, int]:
     return {key: counts[key] for key in sorted(counts)}
 
 
+def _operator_status_summary(counts: dict[str, int]) -> str:
+    if not counts:
+        return "none"
+    preferred = ("implemented", "planned", "unknown", "blocked")
+    parts = [f"{key}={counts[key]}" for key in preferred if key in counts]
+    parts.extend(f"{key}={value}" for key, value in counts.items() if key not in preferred)
+    return " | ".join(parts)
+
+
+def _compact_path(path: Any, *, max_width: int | None = None) -> str:
+    text = str(path)
+    width = max_width or max(48, min(86, terminal_size()[0] - 22))
+    if visible_len(text) <= width:
+        return text
+    parts = [part for part in text.split("/") if part]
+    if len(parts) < 4:
+        return "..." + text[-max(1, width - 3) :]
+    tail = "/".join(parts[-4:])
+    prefix = "~" if text.startswith(str(Path.home())) else ""
+    compact = f"{prefix}/.../{tail}" if prefix else f".../{tail}"
+    if visible_len(compact) <= width:
+        return compact
+    return "..." + compact[-max(1, width - 3) :]
+
+
 def _dirty_status(context: CommandContext) -> str:
     root = context.repo_root
     if root is None:
@@ -339,6 +371,15 @@ def _dirty_status(context: CommandContext) -> str:
     if not rows:
         return f"{CLR_BRIGHT_RED}clean{CLR_RESET}"
     return f"{CLR_RED}dirty{CLR_RESET}{CLR_BG_BLACK} paths={len(rows)}"
+
+
+def _next_action_hint(worktree_status: str) -> str:
+    plain = _ANSI_RE.sub("", worktree_status)
+    if "dirty" in plain:
+        return f"{CLR_RED}Review worktree before claim/release/hook actions.{CLR_RESET}"
+    if "unknown" in plain:
+        return f"{CLR_MUTED}Run Refresh State + Doctor before changing horizons.{CLR_RESET}"
+    return f"{CLR_MUTED}Run Hook Check before landing or handing off changes.{CLR_RESET}"
 
 
 def _count_values(values: Sequence[str] | Any) -> dict[str, int]:
