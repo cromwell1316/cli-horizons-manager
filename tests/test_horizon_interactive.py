@@ -118,8 +118,15 @@ def test_run_direct_uses_clean_command_screen(monkeypatch, capsys) -> None:
     calls = []
 
     monkeypatch.setattr("horizon_manager.interactive.clear_screen", lambda: calls.append("clear"))
-    monkeypatch.setattr("horizon_manager.interactive.run_command", lambda args, context: CommandResult(True, "next", message="ok: next 1 recommendations"))
-    monkeypatch.setattr("horizon_manager.interactive.emit_result", lambda result, output_format: print(result.message))
+    monkeypatch.setattr(
+        "horizon_manager.interactive.run_command",
+        lambda args, context: CommandResult(
+            True,
+            "next",
+            data={"context": {"corpus": "horizon-manager", "horizons_dir": "/tmp/projects/shared/GeoForge/management/subprojects/horizon-manager/management/horizons"}},
+            message="1 recommendations",
+        ),
+    )
 
     result = _run_direct(["next", "--limit", "1"], CommandContext(corpus_name="horizon-manager"))
 
@@ -129,7 +136,11 @@ def test_run_direct_uses_clean_command_screen(monkeypatch, capsys) -> None:
     assert "HORIZON MANAGER COMMAND" in plain
     assert "Command : Overview / Next Horizons" in plain
     assert "Corpus  : horizon-manager" in plain
-    assert "ok: next 1 recommendations" in plain
+    assert "Result" in plain
+    assert "Status  : ok" in plain
+    assert "Message : next: 1 recommendations" in plain
+    assert "Context : corpus=horizon-manager | horizons=" in plain
+    assert "ok: next" not in plain
 
 
 def test_interactive_corpus_selector_changes_context(monkeypatch, capsys) -> None:

@@ -12,7 +12,7 @@ import shutil
 import subprocess
 from typing import Any
 
-from .cli import CommandContext, build_parser, emit_result, run_command
+from .cli import CommandContext, build_parser, run_command
 from .corpus import known_corpora
 
 
@@ -263,9 +263,7 @@ def _run_direct(argv: list[str], context: CommandContext, *, clear: bool = True)
     parser = build_parser()
     args = parser.parse_args(argv)
     result = run_command(args, context=context)
-    emit_result(result, getattr(args, "format", "text"))
-    for line in command_feedback_lines(result):
-        print(line)
+    _show_command_result(result)
     return int(result.exit_code)
 
 
@@ -285,6 +283,34 @@ def _show_command_screen(argv: Sequence[str], context: CommandContext, *, title:
 def _command_title(argv: Sequence[str]) -> str:
     command = str(argv[0]) if argv else "Command"
     return COMMAND_TITLES.get(command, " ".join(str(part) for part in argv) or "Command")
+
+
+def _show_command_result(result: Any) -> None:
+    status = f"{CLR_BRIGHT_RED}ok{CLR_RESET}" if getattr(result, "ok", False) else f"{CLR_RED}blocked{CLR_RESET}"
+    lines = [
+        f"{CLR_DIM}Result{CLR_RESET}",
+        _status_line("Status", status),
+        _status_line("Message", _result_message(result)),
+    ]
+    context = (getattr(result, "data", {}) or {}).get("context")
+    if isinstance(context, dict) and context.get("corpus"):
+        horizons = _compact_path(context.get("horizons_dir", ""), max_width=max(32, terminal_size()[0] - 30))
+        lines.append(_status_line("Context", f"corpus={context['corpus']} | horizons={horizons}"))
+    diagnostics = tuple(str(item) for item in getattr(result, "diagnostics", ()) or ())
+    if diagnostics:
+        lines.append(f"{CLR_DIM}Diagnostics{CLR_RESET}")
+        lines.extend(f"{CLR_RED}- {item}{CLR_RESET}" for item in diagnostics)
+    feedback = command_feedback_lines(result)
+    if feedback:
+        lines.append(f"{CLR_DIM}Summary{CLR_RESET}")
+        lines.extend(f"{CLR_MUTED}{line}{CLR_RESET}" for line in feedback)
+    print("\n".join(themed_block_lines(lines, top_padding=0)))
+
+
+def _result_message(result: Any) -> str:
+    message = str(getattr(result, "message", "") or "")
+    command = str(getattr(result, "command", "") or "command")
+    return f"{command}: {message}" if message else command
 
 
 def operator_status_lines(context: CommandContext) -> tuple[str, ...]:
@@ -365,7 +391,7 @@ def _prompt(label: str, *, default: str = "") -> str:
 
 def _pause() -> None:
     try:
-        input("\nPress Enter to continue...")
+        input(f"\n{CLR_BG_BLACK}    {CLR_MUTED}Press {CLR_WHITE}Enter{CLR_MUTED} to continue...{CLR_RESET}{CLR_BG_BLACK}")
     except EOFError:
         pass
 
