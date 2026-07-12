@@ -39,6 +39,8 @@ class HookChangeClassification(str, Enum):
 @dataclass(frozen=True)
 class HookContext:
     changed_paths: tuple[Path, ...]
+    repo_root: Path | None = None
+    generated_dir: Path | None = None
     claimed_horizons: tuple[str, ...] = ()
     agent_id: str = "local-hook"
     state: HorizonState | None = None
@@ -50,7 +52,11 @@ class HookContext:
     allow_inventory_only: bool = True
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "changed_paths", tuple(Path(path) for path in self.changed_paths))
+        repo_root = _normalized_base_path(self.repo_root, None)
+        object.__setattr__(self, "repo_root", Path(repo_root) if repo_root else None)
+        generated_dir = _normalized_base_path(self.generated_dir, repo_root)
+        object.__setattr__(self, "generated_dir", Path(generated_dir) if generated_dir is not None else None)
+        object.__setattr__(self, "changed_paths", tuple(Path(_normalize_changed_path(path, repo_root)) for path in self.changed_paths))
         object.__setattr__(self, "claimed_horizons", tuple(sorted(str(HorizonId(item)) for item in self.claimed_horizons)))
 
 
@@ -99,8 +105,11 @@ class HookReport:
         }
 
 
-def classify_hook_change(path: str | Path) -> str:
-    return _classify_hook_change(path).value
+def classify_hook_change(path: str | Path, *, repo_root: str | Path | None = None, generated_dir: str | Path | None = None) -> str:
+    repo_root_text = _normalized_base_path(repo_root, None)
+    normalized = _normalize_changed_path(path, repo_root_text)
+    generated_text = _normalized_base_path(generated_dir, repo_root_text)
+    return _classify_hook_change(normalized, generated_text).value
 
 
 def run_hook(mode: HookMode | str, context: HookContext) -> HookReport:
@@ -174,16 +183,14 @@ def collect_git_changed_paths(mode: HookMode | str, repo_root: str | Path = ".")
 _HORIZON_DIR_NAMES = frozenset({"horizons", "horizonts"})
 
 
-def _classify_hook_change(path: str | Path) -> HookChangeClassification:
-    text = str(path).replace("\\", "/")
+def _classify_hook_change(path: str | Path, generated_dir: str | None = None) -> HookChangeClassification:
+    text = _normalize_path_text(path).strip("/")
     name = Path(text).name
     if _has_horizon_dir_segment(text):
         return HookChangeClassification.HORIZON_OWNED
     if name == "MANAGEMENT_DOC_INVENTORY.md":
         return HookChangeClassification.INVENTORY
-    if text.endswith(".json") and "management/subprojects/hermes-consistency-orchestrator/horizon_" in text:
-        return HookChangeClassification.GENERATED_OUTPUT
-    if text.endswith(".html") and "management/subprojects/hermes-consistency-orchestrator/horizon_" in text:
+    if _is_generated_output_path(text, generated_dir):
         return HookChangeClassification.GENERATED_OUTPUT
     if "horizon-manager/" in text:
         return HookChangeClassification.MANAGER_CODE
@@ -213,7 +220,7 @@ def _hook_change(path: Path, context: HookContext) -> HookChange:
     return HookChange(
         path=normalized,
         status="changed",
-        classification=_classify_hook_change(path),
+        classification=_classify_hook_change(normalized, _path_text(context.generated_dir)),
         horizon_id=horizon_id,
     )
 
@@ -313,3 +320,60 @@ def _path_matches(pattern: str, path: str) -> bool:
     if pattern.endswith("*"):
         return path.startswith(pattern[:-1])
     return path.startswith(pattern.rstrip("/") + "/")
+
+
+def _is_generated_output_path(path: str, generated_dir: str | None) -> bool:
+    normalized = _normalize_path_text(path).strip("/")
+    name = Path(normalized).name
+    if not name.startswith("horizon_") or Path(name).suffix not in {".json", ".jsonl", ".html"}:
+        return False
+    if not generated_dir:
+        return False
+    generated = _directory_key(generated_dir)
+    parent = str(Path(normalized).parent).replace("\\", "/")
+    parent = _directory_key(parent)
+    return parent == generated
+
+
+def _normalize_changed_path(path: str | Path, repo_root: str | None) -> str:
+    text = _normalize_path_text(path)
+    if repo_root:
+        root = repo_root.rstrip("/")
+        if text == root:
+            return "."
+        if text.startswith(root + "/"):
+            return text[len(root) + 1 :]
+    return text.strip("/")
+
+
+def _normalized_base_path(path: str | Path | None, repo_root: str | None) -> str | None:
+    if path is None:
+        return None
+    text = _normalize_path_text(path).rstrip("/")
+    if not text:
+        return None
+    if repo_root:
+        root = repo_root.rstrip("/")
+        if text == root:
+            return "."
+        if text.startswith(root + "/"):
+            return text[len(root) + 1 :]
+    return text
+
+
+def _normalize_path_text(path: str | Path) -> str:
+    text = str(path).strip().replace("\\", "/")
+    if text.startswith("//wsl.localhost/Ubuntu/"):
+        text = text.removeprefix("//wsl.localhost/Ubuntu")
+    elif text.startswith("//wsl$/Ubuntu/"):
+        text = text.removeprefix("//wsl$/Ubuntu")
+    return text.strip()
+
+
+def _path_text(path: Path | None) -> str | None:
+    return None if path is None else path.as_posix()
+
+
+def _directory_key(path: str) -> str:
+    text = _normalize_path_text(path).strip("/")
+    return "" if text in {"", "."} else text

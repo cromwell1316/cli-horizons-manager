@@ -395,6 +395,8 @@ def _run_hook(args: argparse.Namespace, ctx: CommandContext) -> CommandResult:
         args.mode,
         HookContext(
             changed_paths=changed,
+            repo_root=ctx.repo_root,
+            generated_dir=ctx.generated_dir,
             claimed_horizons=tuple(args.claim or ()),
             agent_id=args.agent,
             state=state,

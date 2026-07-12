@@ -2,10 +2,10 @@
 
 Owner: agent-toolchain
 Source of Truth: management/horizons/H09_Hook_Path_Normalization_And_Generated_Classification/README.md
-Lifecycle: planned
+Lifecycle: completed
 Document Class: horizon
 
-Status: planned (Wave 4).
+Status: implemented (Wave 4).
 
 ## Purpose
 
@@ -31,9 +31,19 @@ Make hook classification correct for every corpus and for generated outputs.
 
 ## Owned Files (EXCLUSIVE)
 
-- `management/subprojects/horizon-manager/src/horizon_manager/hooks.py`
-- `management/subprojects/horizon-manager/tests/test_horizon_hooks.py`
+- `src/horizon_manager/hooks.py`
+- `tests/test_horizon_hooks.py`
+
+## Owned Files (SHARED)
+
+- `src/horizon_manager/cli.py`
 
 ## Concurrency
 
 Wave 4. Needs: H04/H06.
+
+## Completion Notes
+
+- Hook changed paths are normalized to repo-relative POSIX paths before classification and state ownership checks.
+- Generated hook outputs are classified only when `horizon_*.json`, `horizon_*.jsonl`, or `horizon_*.html` lives directly under the selected generated directory.
+- Runtime generated-output classification no longer depends on a hard-coded HCO path.

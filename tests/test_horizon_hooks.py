@@ -39,6 +39,65 @@ def test_hook_classifies_horizonts_alias_file() -> None:
     assert report.horizon_ids == ("H53",)
 
 
+def test_hook_normalizes_absolute_paths_against_repo_root() -> None:
+    repo_root = Path("/home/olivercromwell/projects/shared/GeoForge")
+    absolute = repo_root / "management/subprojects/horizon-manager/src/horizon_manager/hooks.py"
+    context = HookContext(
+        changed_paths=(absolute,),
+        repo_root=repo_root,
+        agent_id="agent-a",
+        claimed_horizons=("H53",),
+        state=_state(),
+        locks=_lock_for("H53", "agent-a"),
+        now="2026-07-11T10:30:00Z",
+    )
+    report = run_hook(HookMode.MANUAL, context)
+
+    assert report.ok is True
+    assert report.changed_paths == ("management/subprojects/horizon-manager/src/horizon_manager/hooks.py",)
+    assert report.horizon_ids == ("H53",)
+
+
+def test_hook_normalizes_wsl_unc_paths_against_repo_root() -> None:
+    repo_root = r"\\wsl.localhost\Ubuntu\home\olivercromwell\projects\shared\GeoForge"
+    changed = (
+        r"\\wsl.localhost\Ubuntu\home\olivercromwell\projects\shared\GeoForge"
+        r"\management\subprojects\horizon-manager\src\horizon_manager\hooks.py"
+    )
+    context = HookContext(
+        changed_paths=(Path(changed),),
+        repo_root=repo_root,
+        agent_id="agent-a",
+        claimed_horizons=("H53",),
+        state=_state(),
+        locks=_lock_for("H53", "agent-a"),
+        now="2026-07-11T10:30:00Z",
+    )
+    report = run_hook(HookMode.MANUAL, context)
+
+    assert report.ok is True
+    assert report.changed_paths == ("management/subprojects/horizon-manager/src/horizon_manager/hooks.py",)
+
+
+def test_generated_outputs_are_classified_from_selected_generated_dir() -> None:
+    path = "other/project/management/horizon_state.json"
+
+    assert classify_hook_change(path, generated_dir="other/project/management") == "generated-output"
+    assert classify_hook_change(path, generated_dir="management/subprojects/hermes-consistency-orchestrator") == "unrelated"
+
+
+def test_hook_classifies_root_generated_dir_outputs() -> None:
+    context = HookContext(
+        changed_paths=(Path("/tmp/repo/horizon_events.jsonl"), Path("/tmp/repo/horizon_dashboard.html")),
+        repo_root=Path("/tmp/repo"),
+        generated_dir=Path("/tmp/repo"),
+    )
+    report = run_hook(HookMode.MANUAL, context)
+
+    assert report.ok is True
+    assert {change.classification.value for change in report.changes} == {"generated-output"}
+
+
 def test_unclaimed_horizon_edit_blocks() -> None:
     context = HookContext(
         changed_paths=(Path("management/x/horizons/H53_Horizon_Hooks_Integration/README.md"),),
@@ -229,6 +288,10 @@ def _state() -> HorizonState:
             ),
         )
     )
+
+
+def _lock_for(horizon_id: str, agent_id: str) -> LockSnapshot:
+    return LockSnapshot((HorizonLock(horizon_id, agent_id, claimed_at="2026-07-11T10:00:00Z", expires_at="2026-07-11T12:00:00Z"),))
 
 
 def _write_readme(root: Path, horizon: str, title: str, status: str, owned_path: str) -> None:
