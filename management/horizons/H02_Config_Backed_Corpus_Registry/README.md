@@ -2,10 +2,10 @@
 
 Owner: agent-toolchain
 Source of Truth: management/horizons/H02_Config_Backed_Corpus_Registry/README.md
-Lifecycle: planned
+Lifecycle: completed
 Document Class: horizon
 
-Status: planned (Wave 1).
+Status: implemented (Wave 1).
 
 ## Purpose
 
@@ -31,9 +31,17 @@ Replace hardcoded project assumptions with a registry that can describe every ma
 
 ## Owned Files (EXCLUSIVE)
 
-- `management/subprojects/horizon-manager/src/horizon_manager/corpus.py`
-- `management/subprojects/horizon-manager/tests/test_horizon_corpus.py`
+- `src/horizon_manager/corpus.py`
+- `tests/test_horizon_corpus.py`
 
 ## Concurrency
 
 Wave 1. Needs: H01.
+
+## Completion Notes
+
+- Built-in corpora and optional TOML-configured corpora load through one registry API.
+- `HORIZON_MANAGER_CORPORA_CONFIG` can point at a future corpus config file without
+  changing CLI call sites.
+- Corpus path diagnostics are deterministic and cover missing paths, non-directories,
+  and empty horizon directories.

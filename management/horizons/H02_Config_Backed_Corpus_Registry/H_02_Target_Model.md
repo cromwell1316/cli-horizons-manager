@@ -15,5 +15,5 @@ Replace hardcoded project assumptions with a registry that can describe every ma
 
 ## Owned Implementation Surface
 
-- management/subprojects/horizon-manager/src/horizon_manager/corpus.py
-- management/subprojects/horizon-manager/tests/test_horizon_corpus.py
+- src/horizon_manager/corpus.py
+- tests/test_horizon_corpus.py
