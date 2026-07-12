@@ -14,6 +14,8 @@ sys.path.insert(0, str(PACKAGE_SRC))
 
 from horizon_manager.cli import ExitCode, build_parser, run_command, CommandContext  # noqa: E402
 from horizon_manager.hooks import (
+    HORIZON_DIR_ALIAS_NAMES,
+    HORIZON_DIR_CANONICAL_NAME,
     HookContext,
     HookMode,
     classify_hook_change,
@@ -37,6 +39,12 @@ def test_hook_classifies_horizonts_alias_file() -> None:
     assert classify_hook_change(path) == "horizon-owned"
     assert report.ok is True
     assert report.horizon_ids == ("H53",)
+
+
+def test_horizonts_is_documented_compatibility_alias() -> None:
+    assert HORIZON_DIR_CANONICAL_NAME == "horizons"
+    assert HORIZON_DIR_ALIAS_NAMES == frozenset({"horizonts"})
+    assert classify_hook_change("management/horizonts/H15_Alias/README.md") == "horizon-owned"
 
 
 def test_hook_normalizes_absolute_paths_against_repo_root() -> None:

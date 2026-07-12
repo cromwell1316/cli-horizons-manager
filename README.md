@@ -78,6 +78,11 @@ paths use Linux filesystem semantics.
 - `management/horizons/` - this application's own management horizon corpus.
 - `tests/` - application tests.
 
+`horizons` is the canonical directory name for horizon corpora. The historical
+misspelling `horizonts` is retained only as a deprecated compatibility alias for
+hook and watcher path classification; new corpora and documentation should use
+`horizons`.
+
 ## Managed Corpora
 The default registry includes these corpora for the local operator environment:
 - `hco` -> `~/projects/shared/GeoForge/management/subprojects/hermes-consistency-orchestrator/horizons`

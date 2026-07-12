@@ -2,10 +2,10 @@
 
 Owner: agent-toolchain
 Source of Truth: management/horizons/H15_Horizonts_Alias_And_Typo_Cleanup/README.md
-Lifecycle: planned
+Lifecycle: completed
 Document Class: horizon
 
-Status: planned (Wave 7).
+Status: implemented (Wave 7).
 
 ## Purpose
 
@@ -31,12 +31,18 @@ Resolve the accidental horizonts spelling support by formalizing or removing it.
 
 ## Owned Files (EXCLUSIVE)
 
-- `management/subprojects/horizon-manager/src/horizon_manager/hooks.py`
-- `management/subprojects/horizon-manager/src/horizon_manager/watch.py`
-- `management/subprojects/horizon-manager/tests/test_horizon_hooks.py`
-- `management/subprojects/horizon-manager/tests/test_horizon_watch.py`
-- `management/subprojects/horizon-manager/README.md`
+- `src/horizon_manager/hooks.py`
+- `src/horizon_manager/watch.py`
+- `tests/test_horizon_hooks.py`
+- `tests/test_horizon_watch.py`
+- `README.md`
 
 ## Concurrency
 
 Wave 7. Needs: H07/H09.
+
+## Completion Notes
+
+- `horizons` is the canonical directory name.
+- `horizonts` is formalized as a deprecated compatibility alias for hook and watcher path classification only.
+- No stale `horizonts` directories exist in this checkout.

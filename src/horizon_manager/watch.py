@@ -190,7 +190,9 @@ class DaemonRefreshBackend(SnapshotWatchBackend):
             _send_daemon_command(command)
 
 
-_HORIZON_DIR_NAMES = frozenset({"horizons", "horizonts"})
+HORIZON_DIR_CANONICAL_NAME = "horizons"
+HORIZON_DIR_ALIAS_NAMES = frozenset({"horizonts"})
+_HORIZON_DIR_NAMES = frozenset({HORIZON_DIR_CANONICAL_NAME, *HORIZON_DIR_ALIAS_NAMES})
 
 
 def classify_change(path: str | Path) -> RefreshRequest:

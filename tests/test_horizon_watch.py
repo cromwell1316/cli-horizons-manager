@@ -5,6 +5,8 @@ from pathlib import Path
 from horizon_manager.corpus import HorizonCorpus
 from horizon_manager.events import read_events
 from horizon_manager.watch import (
+    HORIZON_DIR_ALIAS_NAMES,
+    HORIZON_DIR_CANONICAL_NAME,
     SnapshotWatchBackend,
     WatchConfig,
     WatchEvent,
@@ -38,6 +40,13 @@ def test_horizonts_alias_doc_change_refreshes_all_horizon_views() -> None:
     plan = classify_change("management/horizonts/H52_Horizon_File_Watcher/README.md")
     assert plan.targets == ("state", "dashboard", "dag", "history")
     assert plan.reasons == ("horizon-document",)
+
+
+def test_horizonts_alias_is_documented_for_watcher() -> None:
+    assert HORIZON_DIR_CANONICAL_NAME == "horizons"
+    assert HORIZON_DIR_ALIAS_NAMES == frozenset({"horizonts"})
+    plan = classify_change("management/horizonts/H15_Alias/V_03_Implementation_Evidence.md")
+    assert plan.targets == ("state", "dashboard", "dag", "history")
 
 
 def test_git_status_change_refreshes_preflight_only() -> None:

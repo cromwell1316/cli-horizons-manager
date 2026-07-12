@@ -6,6 +6,13 @@ Source of Truth: management/horizons/H15_Horizonts_Alias_And_Typo_Cleanup/README
 
 Resolve the accidental horizonts spelling support by formalizing or removing it.
 
+## Implemented Model
+
+- `horizons` is the canonical corpus directory name.
+- `horizonts` remains supported as a deprecated compatibility alias in hook and watcher path classification.
+- Alias support is explicit through exported canonical/alias constants in `hooks.py` and `watch.py`.
+- New documentation points operators to `horizons`.
+
 ## Required Properties
 
 - Deterministic CLI and JSON behavior.
@@ -15,8 +22,8 @@ Resolve the accidental horizonts spelling support by formalizing or removing it.
 
 ## Owned Implementation Surface
 
-- management/subprojects/horizon-manager/src/horizon_manager/hooks.py
-- management/subprojects/horizon-manager/src/horizon_manager/watch.py
-- management/subprojects/horizon-manager/tests/test_horizon_hooks.py
-- management/subprojects/horizon-manager/tests/test_horizon_watch.py
-- management/subprojects/horizon-manager/README.md
+- src/horizon_manager/hooks.py
+- src/horizon_manager/watch.py
+- tests/test_horizon_hooks.py
+- tests/test_horizon_watch.py
+- README.md

@@ -180,7 +180,9 @@ def collect_git_changed_paths(mode: HookMode | str, repo_root: str | Path = ".")
     return tuple(Path(line.strip()) for line in result.stdout.splitlines() if line.strip())
 
 
-_HORIZON_DIR_NAMES = frozenset({"horizons", "horizonts"})
+HORIZON_DIR_CANONICAL_NAME = "horizons"
+HORIZON_DIR_ALIAS_NAMES = frozenset({"horizonts"})
+_HORIZON_DIR_NAMES = frozenset({HORIZON_DIR_CANONICAL_NAME, *HORIZON_DIR_ALIAS_NAMES})
 
 
 def _classify_hook_change(path: str | Path, generated_dir: str | None = None) -> HookChangeClassification:
