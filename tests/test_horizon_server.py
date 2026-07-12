@@ -20,6 +20,7 @@ def test_state_endpoint_returns_stable_envelope() -> None:
 def test_all_read_endpoints_exist() -> None:
     state = DaemonState(
         data={
+            "metadata": {"corpus": "demo"},
             "state": {"count": 1},
             "doctor": {"ok": True},
             "conflicts": {"conflict_count": 0},
@@ -29,10 +30,37 @@ def test_all_read_endpoints_exist() -> None:
             "dashboard": "<!doctype html>",
         }
     )
-    for path in ("/state", "/doctor", "/conflicts", "/locks", "/next", "/events", "/dashboard"):
+    for path in ("/metadata", "/state", "/doctor", "/conflicts", "/locks", "/next", "/events", "/dashboard"):
         response = handle_request(DaemonRequest("GET", path), state)
         assert response["ok"] is True
         assert response["error"] is None
+
+
+def test_refresh_state_exposes_corpus_metadata() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        horizons = root / "management/horizons"
+        generated = root / "management"
+        _write_readme(horizons, "H39", "State", "implemented", 7, ())
+        config = DaemonConfig(
+            corpus_path=horizons,
+            generated_dir=generated,
+            corpus_name="demo",
+            corpus_title="Demo Corpus",
+            repo_root=root,
+        )
+        state = refresh_state(config)
+        response = handle_request(DaemonRequest("GET", "/metadata"), state)
+
+    assert response["ok"] is True
+    assert response["data"] == {
+        "corpus": "demo",
+        "generated_dir": str(generated),
+        "horizons_dir": str(horizons),
+        "repo_root": str(root),
+        "title": "Demo Corpus",
+    }
+    assert state.data["metadata"] == response["data"]
 
 
 def test_readonly_blocks_mutations() -> None:

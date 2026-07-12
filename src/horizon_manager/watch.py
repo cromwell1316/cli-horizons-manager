@@ -26,10 +26,15 @@ class WatchConfig:
     render_targets: tuple[str, ...] = ("dashboard", "dag", "history")
     event_log_path: Path | None = None
     actor: str = "horizon-watch"
+    corpora: tuple[Any, ...] = ()
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "watched_roots", tuple(Path(root) for root in self.watched_roots))
+        roots = tuple(Path(root) for root in self.watched_roots)
+        if self.corpora:
+            roots = tuple(sorted((*roots, *registered_corpus_watch_roots(self.corpora)), key=lambda item: item.as_posix()))
+        object.__setattr__(self, "watched_roots", roots)
         object.__setattr__(self, "render_targets", tuple(sorted(str(target) for target in self.render_targets)))
+        object.__setattr__(self, "corpora", tuple(sorted(self.corpora, key=lambda item: _corpus_name(item))))
         if self.event_log_path is not None:
             object.__setattr__(self, "event_log_path", Path(self.event_log_path))
         if self.debounce_ms < 0:
@@ -108,6 +113,22 @@ class RefreshRequest:
 
 
 RefreshPlan = RefreshRequest
+
+
+@dataclass(frozen=True)
+class CorpusRefreshPlan:
+    corpus: dict[str, str]
+    request: RefreshRequest
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "corpus", _stable_value(self.corpus))
+
+    @property
+    def has_work(self) -> bool:
+        return self.request.has_work
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"corpus": self.corpus, "request": self.request.to_dict()}
 
 
 @dataclass(frozen=True)
@@ -253,6 +274,20 @@ def plan_refresh(events: Iterable[WatchEvent], *, window_ms: int = 250) -> Refre
     return merge_plans(plans)
 
 
+def plan_corpus_refresh(events: Iterable[WatchEvent], corpora: Iterable[Any], *, window_ms: int = 250) -> tuple[CorpusRefreshPlan, ...]:
+    """Build deterministic refresh plans scoped to registered corpora."""
+
+    debounced = debounce_events(list(events), window_ms)
+    plans: list[CorpusRefreshPlan] = []
+    for corpus in sorted(tuple(corpora), key=lambda item: _corpus_name(item)):
+        scoped_events = tuple(_event_for_corpus(event, corpus) for event in debounced)
+        scoped_events = tuple(event for event in scoped_events if event is not None)
+        request = plan_refresh(scoped_events, window_ms=0)
+        if request.has_work:
+            plans.append(CorpusRefreshPlan(_corpus_metadata(corpus), request))
+    return tuple(plans)
+
+
 def run_watch_loop(config: WatchConfig, backend: WatchBackend) -> RefreshRequest:
     """Process one injectable backend batch for deterministic tests."""
 
@@ -311,6 +346,15 @@ def snapshot_watch_paths(roots: Iterable[str | Path]) -> dict[str, tuple[int, in
     return {key: snapshot[key] for key in sorted(snapshot)}
 
 
+def registered_corpus_watch_roots(corpora: Iterable[Any]) -> tuple[Path, ...]:
+    """Return stable root directories for all registered corpora."""
+
+    roots = []
+    for corpus in corpora:
+        roots.append(Path(_corpus_field(corpus, "repo_root")))
+    return tuple(sorted({root for root in roots}, key=lambda item: item.as_posix()))
+
+
 def _is_horizon_document(name: str) -> bool:
     return name == "README.md" or (name.endswith(".md") and (name.startswith("H_") or name.startswith("V_")))
 
@@ -328,6 +372,51 @@ def _is_generated_render_output(text: str) -> bool:
 
 def _display_path(path: str | Path) -> str:
     return str(path).replace("\\", "/")
+
+
+def _event_for_corpus(event: WatchEvent, corpus: Any) -> WatchEvent | None:
+    path = Path(event.path)
+    repo_root = Path(_corpus_field(corpus, "repo_root"))
+    horizons_dir = Path(_corpus_field(corpus, "horizons_dir"))
+    generated_dir = Path(_corpus_field(corpus, "generated_dir"))
+    relative = _relative_to_any(path, (repo_root, horizons_dir, generated_dir))
+    if relative is None:
+        return None
+    return WatchEvent(relative, event.kind, event.timestamp_ms, event.reason)
+
+
+def _relative_to_any(path: Path, roots: Iterable[Path]) -> Path | None:
+    for root in sorted((Path(item) for item in roots), key=lambda item: len(item.as_posix()), reverse=True):
+        try:
+            relative = path.relative_to(root)
+        except ValueError:
+            continue
+        if root.name in _HORIZON_DIR_NAMES:
+            return Path(root.name) / relative
+        if root.name == "management":
+            return Path("management") / relative
+        return relative
+    return path if not path.is_absolute() else None
+
+
+def _corpus_metadata(corpus: Any) -> dict[str, str]:
+    return {
+        "name": _corpus_name(corpus),
+        "title": _corpus_field(corpus, "title"),
+        "repo_root": _corpus_field(corpus, "repo_root"),
+        "horizons_dir": _corpus_field(corpus, "horizons_dir"),
+        "generated_dir": _corpus_field(corpus, "generated_dir"),
+    }
+
+
+def _corpus_name(corpus: Any) -> str:
+    return _corpus_field(corpus, "name")
+
+
+def _corpus_field(corpus: Any, field: str) -> str:
+    if isinstance(corpus, dict):
+        return str(corpus.get(field, ""))
+    return str(getattr(corpus, field))
 
 
 def _event_id(request: RefreshRequest) -> str:

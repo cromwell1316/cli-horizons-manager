@@ -2,10 +2,10 @@
 
 Owner: agent-toolchain
 Source of Truth: management/horizons/H13_Daemon_And_Watcher_Multi_Corpus/README.md
-Lifecycle: planned
+Lifecycle: completed
 Document Class: horizon
 
-Status: planned (Wave 6).
+Status: implemented (Wave 6).
 
 ## Purpose
 
@@ -31,11 +31,18 @@ Teach daemon and watcher contracts to operate over selected or registered corpor
 
 ## Owned Files (EXCLUSIVE)
 
-- `management/subprojects/horizon-manager/src/horizon_manager/server.py`
-- `management/subprojects/horizon-manager/src/horizon_manager/watch.py`
-- `management/subprojects/horizon-manager/tests/test_horizon_server.py`
-- `management/subprojects/horizon-manager/tests/test_horizon_watch.py`
+- `src/horizon_manager/server.py`
+- `src/horizon_manager/watch.py`
+- `tests/test_horizon_server.py`
+- `tests/test_horizon_watch.py`
 
 ## Concurrency
 
 Wave 6. Needs: H02/H06.
+
+## Completion Notes
+
+- Daemon config and state expose selected corpus metadata, including corpus name, title, repo root, horizons dir, and generated dir.
+- `/metadata` is available as a read-only daemon endpoint.
+- Watcher configs can derive watched roots from registered corpora and build corpus-scoped refresh plans.
+- Localhost-only daemon validation remains enforced.

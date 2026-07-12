@@ -19,6 +19,7 @@ from .parser import parse_horizon_tree
 
 
 READ_ENDPOINTS = {
+    "/metadata": "metadata",
     "/state": "state",
     "/doctor": "doctor",
     "/conflicts": "conflicts",
@@ -36,6 +37,9 @@ class DaemonConfig:
 
     corpus_path: Path
     generated_dir: Path
+    corpus_name: str = "custom"
+    corpus_title: str = "Custom horizon corpus"
+    repo_root: Path | None = None
     host: str = "127.0.0.1"
     port: int = 8765
     readonly: bool = True
@@ -43,10 +47,23 @@ class DaemonConfig:
     def __post_init__(self) -> None:
         object.__setattr__(self, "corpus_path", Path(self.corpus_path))
         object.__setattr__(self, "generated_dir", Path(self.generated_dir))
+        object.__setattr__(self, "repo_root", Path(self.repo_root) if self.repo_root is not None else _default_repo_root(Path(self.generated_dir)))
+        object.__setattr__(self, "corpus_name", str(self.corpus_name).strip() or "custom")
+        object.__setattr__(self, "corpus_title", str(self.corpus_title).strip() or str(self.corpus_name))
 
     def validate(self) -> None:
         if self.host not in {"127.0.0.1", "localhost", "::1"}:
             raise ValueError("Horizon Manager daemon must bind localhost by default")
+
+    @property
+    def metadata(self) -> dict[str, str]:
+        return {
+            "corpus": self.corpus_name,
+            "title": self.corpus_title,
+            "repo_root": str(self.repo_root),
+            "horizons_dir": str(self.corpus_path),
+            "generated_dir": str(self.generated_dir),
+        }
 
 
 @dataclass
@@ -66,6 +83,8 @@ class DaemonState:
     mutex: RLock = field(default_factory=RLock, repr=False, compare=False)
 
     def sync_data(self) -> None:
+        if self.config is not None:
+            self.data["metadata"] = self.config.metadata
         if self.horizon_state is not None:
             self.data["state"] = self.horizon_state.to_dict()
         if self.doctor_report is not None:
@@ -116,7 +135,7 @@ def refresh_state(config: DaemonConfig) -> DaemonState:
 
     config.validate()
     diagnostics: list[str] = []
-    bundle: dict[str, Any] = {"corpus_path": str(config.corpus_path)}
+    bundle: dict[str, Any] = {"metadata": config.metadata, "corpus_path": str(config.corpus_path)}
 
     try:
         horizon_state = parse_horizon_tree(config.corpus_path)
@@ -349,7 +368,12 @@ def _generated_files(config: DaemonConfig) -> tuple[str, ...]:
 
 
 def _repo_root(config: DaemonConfig) -> Path:
-    return config.generated_dir.parents[2] if len(config.generated_dir.parents) >= 3 else config.generated_dir
+    assert config.repo_root is not None
+    return config.repo_root
+
+
+def _default_repo_root(generated_dir: Path) -> Path:
+    return generated_dir.parents[2] if len(generated_dir.parents) >= 3 else generated_dir
 
 
 def _revision(config: DaemonConfig) -> str:

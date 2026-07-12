@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from horizon_manager.corpus import HorizonCorpus
 from horizon_manager.events import read_events
 from horizon_manager.watch import (
     SnapshotWatchBackend,
@@ -11,6 +12,8 @@ from horizon_manager.watch import (
     daemon_refresh_commands,
     debounce_events,
     plan_refresh,
+    plan_corpus_refresh,
+    registered_corpus_watch_roots,
     run_watch_loop,
     snapshot_watch_paths,
 )
@@ -116,6 +119,34 @@ def test_run_watch_loop_uses_injectable_backend() -> None:
     assert backend.requested == plan
     assert plan.refresh_dashboard is True
     assert plan.refresh_preflight is True
+
+
+def test_watch_config_adds_registered_corpus_roots(tmp_path: Path) -> None:
+    corpus_a = HorizonCorpus("alpha", "Alpha", tmp_path / "alpha", tmp_path / "alpha/management/horizons", tmp_path / "alpha/management")
+    corpus_b = HorizonCorpus("beta", "Beta", tmp_path / "beta", tmp_path / "beta/management/horizons", tmp_path / "beta/management")
+
+    config = WatchConfig(watched_roots=(), corpora=(corpus_b, corpus_a))
+
+    assert config.watched_roots == (tmp_path / "alpha", tmp_path / "beta")
+    assert registered_corpus_watch_roots((corpus_b, corpus_a)) == (tmp_path / "alpha", tmp_path / "beta")
+
+
+def test_plan_corpus_refresh_scopes_events_to_registered_corpora(tmp_path: Path) -> None:
+    alpha = HorizonCorpus("alpha", "Alpha", tmp_path / "alpha", tmp_path / "alpha/management/horizons", tmp_path / "alpha/management")
+    beta = HorizonCorpus("beta", "Beta", tmp_path / "beta", tmp_path / "beta/management/horizons", tmp_path / "beta/management")
+    events = [
+        WatchEvent(alpha.horizons_dir / "H13_Daemon/README.md", "modified", 10),
+        WatchEvent(beta.generated_dir / "horizon_locks.json", "modified", 20),
+        WatchEvent(tmp_path / "unregistered/management/horizons/H99/README.md", "modified", 30),
+    ]
+
+    plans = plan_corpus_refresh(events, (beta, alpha))
+
+    assert [plan.corpus["name"] for plan in plans] == ["alpha", "beta"]
+    assert plans[0].request.targets == ("state", "dashboard", "dag", "history")
+    assert plans[0].request.changed_paths == ("horizons/H13_Daemon/README.md",)
+    assert plans[1].request.targets == ("state", "dashboard")
+    assert plans[1].request.changed_paths == ("management/horizon_locks.json",)
 
 
 def test_run_watch_loop_records_refresh_event(tmp_path: Path) -> None:
