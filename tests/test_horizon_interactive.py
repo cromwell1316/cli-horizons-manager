@@ -11,8 +11,8 @@ PACKAGE_SRC = ROOT / "management/subprojects/horizon-manager/src"
 sys.path.insert(0, str(PACKAGE_SRC))
 
 from horizon_manager import cli  # noqa: E402
-from horizon_manager.cli import CommandContext  # noqa: E402
-from horizon_manager.interactive import _default_menu_runner, render_menu_lines, run_interactive_main  # noqa: E402
+from horizon_manager.cli import CommandContext, CommandResult  # noqa: E402
+from horizon_manager.interactive import _default_menu_runner, command_feedback_lines, operator_status_lines, render_menu_lines, run_interactive_main  # noqa: E402
 
 
 def test_menu_lines_match_keyboard_first_surface() -> None:
@@ -39,8 +39,47 @@ def test_default_menu_runner_shows_active_corpus(monkeypatch, capsys) -> None:
 
     output = capsys.readouterr().out
     assert selected == 8
-    assert "Active corpus: horizon-manager" in output
+    assert "Active corpus: horizon-manager - Horizon Manager management horizons" in output
+    assert "Corpus state: horizons=" in output
+    assert "Locks: active=" in output
+    assert "Doctor:" in output
+    assert "Worktree:" in output
     assert "management/horizons" in output
+
+
+def test_operator_status_lines_are_script_friendly(monkeypatch) -> None:
+    monkeypatch.setattr("horizon_manager.interactive._dirty_status", lambda context: "clean")
+
+    lines = operator_status_lines(CommandContext(corpus_name="horizon-manager"))
+
+    assert all("\n" not in line for line in lines)
+    assert any(line.startswith("Active corpus: horizon-manager") for line in lines)
+    assert "Worktree: clean" in lines
+
+
+def test_command_feedback_summarizes_doctor_hook_and_preflight() -> None:
+    doctor = CommandResult(
+        False,
+        "doctor",
+        data={"diagnostics": [{"severity": "error"}], "severity_counts": {"error": 1, "warn": 0}},
+        message="diagnostics found errors",
+    )
+    hook = CommandResult(
+        False,
+        "hook",
+        data={"report": {"changes": [{"classification": "horizon-owned"}], "diagnostics": ["blocked"], "ok": False}},
+        message="hook checks blocked",
+    )
+    preflight = CommandResult(
+        True,
+        "preflight",
+        data={"report": {"checks": [{"status": "pass"}], "blockers": [], "ok": True}},
+        message="preflight checks passed",
+    )
+
+    assert command_feedback_lines(doctor) == ("summary: doctor blocked; diagnostics=1 errors=1 warnings=0",)
+    assert command_feedback_lines(hook) == ("summary: hook blocked; changed=1 diagnostics=1 classifications=horizon-owned=1",)
+    assert command_feedback_lines(preflight) == ("summary: preflight ok; checks=1 blockers=0 statuses=pass=1",)
 
 
 def test_interactive_corpus_selector_changes_context(monkeypatch, capsys) -> None:

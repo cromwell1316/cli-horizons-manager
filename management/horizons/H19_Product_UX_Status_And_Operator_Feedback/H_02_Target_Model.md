@@ -12,6 +12,10 @@ Improve operator feedback so corpus state and next actions are visible without r
 - Corpus-scoped paths and generated outputs where runtime state is involved.
 - Backward compatibility for existing HCO corpus workflows unless explicitly superseded.
 - Clear diagnostics when required input is missing or unsafe.
+- Keyboard-first operators can see corpus health, locks, and dirty state without
+  opening generated JSON.
+- Dashboard output includes concise operator feedback rows for doctor, hook,
+  preflight, locks, conflicts, and next recommendations.
 
 ## Owned Implementation Surface
 

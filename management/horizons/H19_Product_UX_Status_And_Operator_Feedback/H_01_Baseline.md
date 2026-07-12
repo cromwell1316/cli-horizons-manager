@@ -2,15 +2,19 @@
 
 Source of Truth: management/horizons/H19_Product_UX_Status_And_Operator_Feedback/README.md
 
-## Current State
+## Baseline State
 
-The current Horizon Manager implementation does not yet fully satisfy this horizon's target behavior. Existing tests may cover adjacent contracts, but this horizon requires focused implementation evidence.
+Before H19, the interactive menu showed only corpus name and horizons directory. The
+dashboard had overview metrics, but no explicit operator feedback rows for doctor,
+hook, or preflight status.
 
-## Known Gaps
+## Closed Gaps
 
-- The implementation needs corpus-aware behavior where applicable.
-- Operator output must be deterministic and script-friendly.
-- Tests must cover the owned files before the horizon can land.
+- Interactive header now includes active corpus, horizon status counts, lock counts,
+  doctor diagnostics, and dirty worktree status.
+- Doctor, hook, and preflight interactive commands now emit concise deterministic
+  summaries.
+- Dashboard rendering now includes an `operator-feedback` section.
 
 ## Baseline Checks
 

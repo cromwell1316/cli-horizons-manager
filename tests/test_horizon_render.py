@@ -17,7 +17,7 @@ from horizon_manager.events import EventType, HorizonEvent  # noqa: E402
 from horizon_manager.locks import HorizonLock, LockSnapshot, LockStatus  # noqa: E402
 from horizon_manager.model import HorizonDependency, HorizonRecord, HorizonState, HorizonStatus, OwnedPath, OwnedPathMode  # noqa: E402
 from horizon_manager.next import RecommendationReport  # noqa: E402
-from horizon_manager.render import DEFAULT_OUTPUT, build_dashboard_model, render_dashboard, write_dashboard  # noqa: E402
+from horizon_manager.render import DEFAULT_OUTPUT, build_dashboard_model, render_dashboard, summarize_doctor, summarize_hook, summarize_preflight, write_dashboard  # noqa: E402
 
 
 def test_render_default_output_is_standalone_management_path() -> None:
@@ -36,11 +36,37 @@ def test_dashboard_model_and_render_are_deterministic() -> None:
 
 def test_required_sections_render() -> None:
     html = render_dashboard(_model(), theme="light")
-    for section_id in ("overview", "board", "next", "blocked", "conflicts", "locks", "timeline"):
+    for section_id in ("overview", "operator-feedback", "board", "next", "blocked", "conflicts", "locks", "timeline"):
         assert f'id="{section_id}"' in html
+    assert "Operator Feedback" in html
     assert "Horizon Board" in html
     assert "Next Recommendations" in html
     assert "Blocked Horizons" in html
+
+
+def test_dashboard_model_includes_operator_feedback() -> None:
+    data = _model().to_dict()
+    rows = {row["surface"]: row for row in data["operator_feedback"]}
+
+    assert rows["doctor"]["status"] == "blocked"
+    assert rows["doctor"]["summary"] == "diagnostics=1 errors=1 warnings=0"
+    assert rows["locks"]["summary"] == "active=1"
+    assert rows["conflicts"]["summary"] == "blocking_pairs=0"
+
+
+def test_operator_summaries_are_concise() -> None:
+    doctor = {"ok": False, "diagnostics": [{"severity": "error"}, {"severity": "warn"}]}
+    hook = {"report": {"ok": False, "changes": [{"path": "a"}], "diagnostics": ["blocked"]}}
+    preflight = {"report": {"ok": True, "checks": [{"status": "pass"}], "blockers": []}}
+
+    assert summarize_doctor(doctor) == {
+        "surface": "doctor",
+        "status": "blocked",
+        "summary": "diagnostics=2 errors=1 warnings=1",
+        "next_action": "fix blocking diagnostics",
+    }
+    assert summarize_hook(hook)["summary"] == "changed=1 diagnostics=1"
+    assert summarize_preflight(preflight)["summary"] == "checks=1 blockers=0"
 
 
 def test_dashboard_uses_corpus_title_when_provided() -> None:

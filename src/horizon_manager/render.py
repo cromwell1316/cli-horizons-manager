@@ -52,6 +52,7 @@ class DashboardSection:
 class DashboardModel:
     overview: dict[str, Any]
     board: tuple[dict[str, Any], ...]
+    operator_feedback: tuple[dict[str, Any], ...] = ()
     next_recommendations: tuple[dict[str, Any], ...] = ()
     blocked_horizons: tuple[dict[str, Any], ...] = ()
     conflict_summary: dict[str, Any] = field(default_factory=dict)
@@ -62,6 +63,7 @@ class DashboardModel:
     def __post_init__(self) -> None:
         object.__setattr__(self, "overview", _stable_value(self.overview))
         object.__setattr__(self, "board", tuple(sorted((_stable_value(row) for row in self.board), key=lambda row: _id_number(row["horizon_id"]))))
+        object.__setattr__(self, "operator_feedback", tuple(_stable_value(row) for row in self.operator_feedback))
         object.__setattr__(self, "next_recommendations", tuple(_stable_value(row) for row in self.next_recommendations))
         object.__setattr__(self, "blocked_horizons", tuple(_stable_value(row) for row in self.blocked_horizons))
         object.__setattr__(self, "conflict_summary", _stable_value(self.conflict_summary))
@@ -74,6 +76,7 @@ class DashboardModel:
         return {
             "overview": self.overview,
             "board": list(self.board),
+            "operator_feedback": list(self.operator_feedback),
             "next_recommendations": list(self.next_recommendations),
             "blocked_horizons": list(self.blocked_horizons),
             "conflict_summary": self.conflict_summary,
@@ -98,6 +101,7 @@ def build_dashboard_model(
     return DashboardModel(
         overview=overview,
         board=board,
+        operator_feedback=_operator_feedback(doctor=doctor, conflicts=conflicts, locks=locks, next_report=next_report),
         next_recommendations=_recommendations(next_report),
         blocked_horizons=_blocked_horizons(records, doctor),
         conflict_summary=_conflict_summary(conflicts),
@@ -126,6 +130,7 @@ def render_dashboard(model: DashboardModel | dict[str, Any], theme: str = "auto"
         '<main id="dashboard" class="dashboard">',
         f'<header class="topbar"><div><p class="eyebrow">Horizon Manager</p><h1>{escape(display_title)}</h1></div><button id="theme-toggle" type="button">Theme</button></header>',
         _overview_html(model_dict["overview"]),
+        _table_section("operator-feedback", "Operator Feedback", model_dict.get("operator_feedback", ()), ("surface", "status", "summary", "next_action")),
         _board_html(model_dict["board"]),
         _table_section("next", "Next Recommendations", model_dict["next_recommendations"], ("rank", "horizon_id", "title", "explanation")),
         _table_section("blocked", "Blocked Horizons", model_dict["blocked_horizons"], ("horizon_id", "title", "diagnostics")),
@@ -261,6 +266,7 @@ def _timeline(events: Iterable[Any]) -> tuple[TimelineItem, ...]:
 def _default_sections(model: DashboardModel) -> tuple[DashboardSection, ...]:
     return (
         DashboardSection("overview", "Overview", summary=model.overview),
+        DashboardSection("operator-feedback", "Operator Feedback", rows=model.operator_feedback),
         DashboardSection("board", "Horizon Board", rows=model.board),
         DashboardSection("next", "Next Recommendations", rows=model.next_recommendations),
         DashboardSection("blocked", "Blocked Horizons", rows=model.blocked_horizons),
@@ -274,6 +280,81 @@ def _overview_html(overview: dict[str, Any]) -> str:
     cards = "".join(f'<article class="metric"><span>{escape(str(key).replace("_", " ").title())}</span><strong>{escape(str(value))}</strong></article>' for key, value in overview.items() if key != "status_counts")
     statuses = "".join(f"<li><span>{escape(key)}</span><strong>{value}</strong></li>" for key, value in overview.get("status_counts", {}).items())
     return f'<section id="overview" class="section"><h2>Overview</h2><div class="metrics">{cards}</div><ul class="status-list">{statuses}</ul></section>'
+
+
+def _operator_feedback(*, doctor: Any = None, hook: Any = None, preflight: Any = None, conflicts: Any = None, locks: Any = None, next_report: Any = None) -> tuple[dict[str, str], ...]:
+    rows = [
+        summarize_doctor(doctor),
+        summarize_hook(hook),
+        summarize_preflight(preflight),
+        {
+            "surface": "locks",
+            "status": "active" if _active_locks(locks) else "clear",
+            "summary": f"active={len(_active_locks(locks))}",
+            "next_action": "release stale claims when work is complete" if _active_locks(locks) else "claim a planned horizon before editing",
+        },
+        {
+            "surface": "conflicts",
+            "status": "blocked" if _blocking_conflict_count(conflicts) else "clear",
+            "summary": f"blocking_pairs={_blocking_conflict_count(conflicts)}",
+            "next_action": "resolve blocking ownership or dependency conflicts" if _blocking_conflict_count(conflicts) else "continue with preflight",
+        },
+        {
+            "surface": "next",
+            "status": "ready" if _recommendations(next_report) else "empty",
+            "summary": f"recommendations={len(_recommendations(next_report))}",
+            "next_action": "claim the top recommendation" if _recommendations(next_report) else "refresh state and doctor",
+        },
+    ]
+    return tuple(rows)
+
+
+def summarize_doctor(doctor: Any) -> dict[str, str]:
+    if doctor is None:
+        return {"surface": "doctor", "status": "unknown", "summary": "not loaded", "next_action": "run doctor"}
+    data = _to_dict(doctor)
+    diagnostics = tuple(data.get("diagnostics", ()))
+    errors = sum(1 for row in diagnostics if isinstance(row, dict) and row.get("severity") == "error")
+    warnings = sum(1 for row in diagnostics if isinstance(row, dict) and row.get("severity") == "warn")
+    ok = bool(data.get("ok", errors == 0))
+    return {
+        "surface": "doctor",
+        "status": "ok" if ok else "blocked",
+        "summary": f"diagnostics={len(diagnostics)} errors={errors} warnings={warnings}",
+        "next_action": "continue" if ok else "fix blocking diagnostics",
+    }
+
+
+def summarize_hook(hook: Any) -> dict[str, str]:
+    if hook is None:
+        return {"surface": "hook", "status": "unknown", "summary": "not loaded", "next_action": "run hook check"}
+    data = _to_dict(hook)
+    report = data.get("report", data)
+    changes = tuple(report.get("changes", ())) if isinstance(report, dict) else ()
+    diagnostics = tuple(report.get("diagnostics", ())) if isinstance(report, dict) else ()
+    ok = bool(report.get("ok", not diagnostics)) if isinstance(report, dict) else not diagnostics
+    return {
+        "surface": "hook",
+        "status": "ok" if ok else "blocked",
+        "summary": f"changed={len(changes)} diagnostics={len(diagnostics)}",
+        "next_action": "continue" if ok else "claim horizon or narrow changed paths",
+    }
+
+
+def summarize_preflight(preflight: Any) -> dict[str, str]:
+    if preflight is None:
+        return {"surface": "preflight", "status": "unknown", "summary": "not loaded", "next_action": "run preflight"}
+    data = _to_dict(preflight)
+    report = data.get("report", data)
+    checks = tuple(report.get("checks", ())) if isinstance(report, dict) else ()
+    blockers = tuple(report.get("blockers", ())) if isinstance(report, dict) else ()
+    ok = bool(report.get("ok", not blockers)) if isinstance(report, dict) else not blockers
+    return {
+        "surface": "preflight",
+        "status": "ok" if ok else "blocked",
+        "summary": f"checks={len(checks)} blockers={len(blockers)}",
+        "next_action": "continue" if ok else "clear preflight blockers",
+    }
 
 
 def _board_html(rows: Iterable[dict[str, Any]]) -> str:

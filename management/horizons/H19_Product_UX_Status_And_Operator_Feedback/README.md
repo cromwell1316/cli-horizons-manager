@@ -2,10 +2,10 @@
 
 Owner: agent-toolchain
 Source of Truth: management/horizons/H19_Product_UX_Status_And_Operator_Feedback/README.md
-Lifecycle: planned
+Lifecycle: completed
 Document Class: horizon
 
-Status: planned (Wave 8).
+Status: implemented (Wave 8).
 
 ## Purpose
 
@@ -13,9 +13,12 @@ Improve operator feedback so corpus state and next actions are visible without r
 
 ## Goals
 
-- Show active corpus, horizon counts, lock counts, and dirty status.
-- Render concise doctor/hook/preflight summaries.
-- Keep keyboard-first interaction script-friendly.
+- Show active corpus, horizon counts, lock counts, and dirty status. Done in the
+  interactive menu status header.
+- Render concise doctor/hook/preflight summaries. Done through interactive command
+  feedback and dashboard operator feedback rows.
+- Keep keyboard-first interaction script-friendly. Done with deterministic one-line
+  summaries and unchanged command exit behavior.
 
 ## Files
 

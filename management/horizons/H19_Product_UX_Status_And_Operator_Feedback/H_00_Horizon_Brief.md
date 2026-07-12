@@ -10,11 +10,17 @@ Improve operator feedback so corpus state and next actions are visible without r
 
 Horizon Manager has a clear, testable implementation increment for product ux status and operator feedback.
 
+## Outcome
+
+Implemented. The interactive shell now shows corpus state, locks, doctor health, and
+worktree status before the operator selects an action. Doctor, hook, and preflight
+commands produce concise one-line summaries after their existing CLI output.
+
 ## Success Criteria
 
-- Show active corpus, horizon counts, lock counts, and dirty status.
-- Render concise doctor/hook/preflight summaries.
-- Keep keyboard-first interaction script-friendly.
+- Show active corpus, horizon counts, lock counts, and dirty status. Complete.
+- Render concise doctor/hook/preflight summaries. Complete.
+- Keep keyboard-first interaction script-friendly. Complete.
 
 ## Scope
 
