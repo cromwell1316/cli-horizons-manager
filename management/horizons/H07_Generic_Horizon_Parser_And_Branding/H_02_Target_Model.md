@@ -15,6 +15,13 @@ Remove HCO branding assumptions from generic parsing and rendering while keeping
 
 ## Owned Implementation Surface
 
-- management/subprojects/horizon-manager/src/horizon_manager/parser.py
-- management/subprojects/horizon-manager/src/horizon_manager/model.py
-- management/subprojects/horizon-manager/tests/test_horizon_model.py
+- src/horizon_manager/parser.py
+- src/horizon_manager/model.py
+- tests/test_horizon_model.py
+
+## Implemented Model
+
+- Horizon ids may include a generic leading brand segment before `Hxx`, for example `HM-H07`, while still normalizing to `H07`.
+- Horizon titles remove generic branded id prefixes and preserve plain generic document titles.
+- Dependency extraction accepts generic branded references and collapses repeated normalized dependency sources.
+- Empty horizon directories produce an explicit parse warning instead of silent success.

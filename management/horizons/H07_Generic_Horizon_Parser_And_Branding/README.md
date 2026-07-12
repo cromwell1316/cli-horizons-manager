@@ -2,10 +2,10 @@
 
 Owner: agent-toolchain
 Source of Truth: management/horizons/H07_Generic_Horizon_Parser_And_Branding/README.md
-Lifecycle: planned
+Lifecycle: completed
 Document Class: horizon
 
-Status: planned (Wave 3).
+Status: implemented (Wave 3).
 
 ## Purpose
 
@@ -31,9 +31,16 @@ Remove HCO branding assumptions from generic parsing and rendering while keeping
 
 ## Owned Files (EXCLUSIVE)
 
-- `management/subprojects/horizon-manager/src/horizon_manager/parser.py`
-- `management/subprojects/horizon-manager/src/horizon_manager/model.py`
-- `management/subprojects/horizon-manager/tests/test_horizon_model.py`
+- `src/horizon_manager/parser.py`
+- `src/horizon_manager/model.py`
+- `tests/test_horizon_model.py`
+
+## Completion Notes
+
+- `HorizonId` accepts generic branded horizon prefixes such as `HM-H07` and keeps `HCO-H07` compatibility.
+- README title parsing strips any supported branded prefix before rendering the generic title.
+- Dependency parsing recognizes branded `after`, `depends on`, and `Needs:` references without duplicating the same normalized dependency source.
+- Empty corpus discovery returns a clear `no_readmes` warning naming the inspected directory.
 
 ## Concurrency
 

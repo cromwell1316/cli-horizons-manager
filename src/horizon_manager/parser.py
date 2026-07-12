@@ -28,7 +28,11 @@ _HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
 _STATUS_RE = re.compile(r"^Status:\s*(.+?)\s*$", re.IGNORECASE | re.MULTILINE)
 _WAVE_RE = re.compile(r"\bWave\s+(\d+)\b", re.IGNORECASE)
 _DATE_RE = re.compile(r"\b20\d{2}-\d{2}-\d{2}\b")
-_HID_RE = re.compile(r"\b(?:HCO-)?H(\d{1,3})(?:\s*[-–]\s*(?:H)?(\d{1,3}))?\b", re.IGNORECASE)
+_HID_RE = re.compile(
+    r"\b(?:[A-Za-z][A-Za-z0-9_]*-)?H(\d{1,3})"
+    r"(?:\s*[-–]\s*(?:[A-Za-z][A-Za-z0-9_]*-)?H?(\d{1,3}))?\b",
+    re.IGNORECASE,
+)
 _PATH_RE = re.compile(
     r"(?:(?:management|hco|tools|scripts|docs|src|tests|deep_audit)/[A-Za-z0-9_./*{}?@+=:,~%#-]+|"
     r"[A-Za-z0-9_./-]+\.(?:py|md|json|jsonl|html|sqlite|sh|toml|txt))"
@@ -137,7 +141,8 @@ def _parse_title(text: str, horizon_id: HorizonId) -> str:
         if not match:
             continue
         title = match.group(2).strip()
-        title = re.sub(rf"^(?:HCO-)?{re.escape(str(horizon_id))}\s*", "", title, flags=re.IGNORECASE)
+        title_id = rf"H0*{horizon_id.number}"
+        title = re.sub(rf"^(?:[A-Za-z][A-Za-z0-9_]*-)?{title_id}\s*", "", title, flags=re.IGNORECASE)
         return title.strip(" -:") or str(horizon_id)
     return str(horizon_id)
 
@@ -170,8 +175,9 @@ def _parse_dependencies(
             for dep_id in _extract_ids(raw):
                 if dep_id == horizon_id:
                     continue
-                key = (str(dep_id), source)
-                dependencies.setdefault(key, HorizonDependency(dep_id, _source_label(source, raw), raw.strip()))
+                source_label = _source_label(source, raw)
+                key = (str(dep_id), source_label)
+                dependencies.setdefault(key, HorizonDependency(dep_id, source_label, raw.strip()))
     if not dependencies and _dependency_signal(full_text):
         for raw in _dependency_lines(full_text):
             for dep_id in _extract_ids(raw):
@@ -182,7 +188,7 @@ def _parse_dependencies(
 
 def _dependency_signal(text: str) -> bool:
     lowered = text.lower()
-    return "after h" in lowered or "needs:" in lowered or "←" in text or "depends on h" in lowered
+    return bool(re.search(r"\b(?:after|depends on)\s+(?:[a-z][a-z0-9_]*-)?h\d{1,3}\b", lowered)) or "needs:" in lowered or "←" in text
 
 
 def _dependency_lines(text: str) -> Iterable[str]:
@@ -208,8 +214,10 @@ def _source_label(section: str, raw: str) -> str:
     lowered = raw.lower()
     if "needs:" in lowered:
         return "needs"
-    if "after h" in lowered:
+    if re.search(r"\bafter\s+(?:[a-z][a-z0-9_]*-)?h\d{1,3}\b", lowered):
         return "after"
+    if re.search(r"\bdepends on\s+(?:[a-z][a-z0-9_]*-)?h\d{1,3}\b", lowered):
+        return "depends_on"
     if "←" in raw:
         return "arrow"
     if section == "concurrency":

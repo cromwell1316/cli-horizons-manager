@@ -19,6 +19,8 @@ from horizon_manager.parser import DEFAULT_HORIZONS_DIR, DEFAULT_OUTPUT, parse_h
 def test_horizon_id_and_status_normalization() -> None:
     assert HorizonId("h39") == "H39"
     assert HorizonId("HCO-H7") == "H07"
+    assert HorizonId("HM-H7") == "H07"
+    assert HorizonId("TEAM42-H007_Branded_Title") == "H07"
     assert HorizonId(41).number == 41
     assert HorizonStatus.normalize("implemented (Wave 6, 2026-07-10)") is HorizonStatus.IMPLEMENTED
     assert HorizonStatus.normalize("in progress") is HorizonStatus.IN_PROGRESS
@@ -101,6 +103,43 @@ Wave 7 foundation. After H30/H31. Blocks H40-H54.
         assert modes["management/subprojects/horizon-manager/src/horizon_manager/model.py"] is OwnedPathMode.EXCLUSIVE
         assert modes["management/subprojects/hermes-consistency-orchestrator/horizon_state.json"] is OwnedPathMode.GENERATED
         assert modes["management/subprojects/hermes-consistency-orchestrator/horizons/**/README.md"] is OwnedPathMode.READ_ONLY
+
+
+def test_parser_accepts_generic_branded_horizon_documents() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp) / "horizons"
+        readme = root / "H07_Generic_Branding" / "README.md"
+        _write(
+            readme,
+            """# TEAM42-H007 Generic Branding
+
+Status: planned (Wave 3, after TEAM42-H01).
+
+## Owned Files (EXCLUSIVE)
+- `src/generic.py`
+
+## Concurrency
+Wave 3. After HM-H01. Depends on TEAM-H02.
+""",
+        )
+
+        record = parse_readme(readme, root)
+
+        assert record.id == "H07"
+        assert record.title == "Generic Branding"
+        assert sorted(str(dependency.id) for dependency in record.dependencies) == ["H01", "H02"]
+
+
+def test_empty_corpus_warning_is_clear() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp) / "empty-horizons"
+        root.mkdir()
+
+        state = parse_horizon_tree(root)
+
+        assert state.records == ()
+        assert state.warnings[0].code == "no_readmes"
+        assert "no horizon READMEs found under" in state.warnings[0].message
 
 
 def test_parser_warns_on_missing_optional_sections() -> None:

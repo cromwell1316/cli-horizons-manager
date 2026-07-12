@@ -10,11 +10,11 @@ from pathlib import Path
 from typing import Any, Iterable
 
 
-_HORIZON_ID_RE = re.compile(r"(?:HCO-)?H?(\d{1,3})", re.IGNORECASE)
+_HORIZON_ID_RE = re.compile(r"^\s*(?:[A-Za-z][A-Za-z0-9_]*-)?H?(\d{1,3})(?:\b|[_\s-].*)$", re.IGNORECASE)
 
 
 class HorizonId(str):
-    """Normalized HCO horizon id, for example ``H39``."""
+    """Normalized horizon id, for example ``H39``."""
 
     def __new__(cls, value: str | int) -> "HorizonId":
         if isinstance(value, int):
