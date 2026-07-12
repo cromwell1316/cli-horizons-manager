@@ -1,0 +1,424 @@
+"""Operator CLI for the Horizon Manager application."""
+
+from __future__ import annotations
+
+import argparse
+from dataclasses import dataclass, field
+from enum import IntEnum
+import json
+from pathlib import Path
+import sys
+from typing import Any, Callable, TextIO
+
+from .corpus import corpus_names, default_corpus, known_corpora, resolve_corpus
+
+
+class ExitCode(IntEnum):
+    SUCCESS = 0
+    BAD_INVOCATION = 2
+    VALIDATION_FAILURE = 3
+    CONFLICT = 4
+    MISSING_CLAIM = 5
+    INTERNAL_ERROR = 10
+
+
+@dataclass(frozen=True)
+class CommandResult:
+    ok: bool
+    command: str
+    data: dict[str, Any] = field(default_factory=dict)
+    message: str = ""
+    exit_code: ExitCode = ExitCode.SUCCESS
+    diagnostics: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not self.ok and self.exit_code is ExitCode.SUCCESS:
+            object.__setattr__(self, "exit_code", ExitCode.VALIDATION_FAILURE)
+        object.__setattr__(self, "diagnostics", tuple(sorted(str(item) for item in self.diagnostics)))
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "ok": self.ok,
+            "command": self.command,
+            "exit_code": int(self.exit_code),
+            "message": self.message,
+            "diagnostics": list(self.diagnostics),
+            "data": _stable_value(self.data),
+        }
+
+
+@dataclass(frozen=True)
+class CommandIO:
+    stdout: TextIO = sys.stdout
+    stderr: TextIO = sys.stderr
+
+
+@dataclass
+class CommandContext:
+    repo_root: Path | None = None
+    corpus_name: str | None = None
+    horizons_dir: Path | None = None
+    generated_dir: Path | None = None
+    now: str = ""
+
+    def __post_init__(self) -> None:
+        corpus = resolve_corpus(self.corpus_name)
+        if self.repo_root is None:
+            self.repo_root = corpus.repo_root
+        else:
+            self.repo_root = Path(self.repo_root)
+        if self.horizons_dir is None:
+            self.horizons_dir = corpus.horizons_dir
+        else:
+            self.horizons_dir = Path(self.horizons_dir)
+        if self.generated_dir is None:
+            self.generated_dir = corpus.generated_dir
+        else:
+            self.generated_dir = Path(self.generated_dir)
+
+    def path(self, name: str) -> Path:
+        assert self.generated_dir is not None
+        return self.generated_dir / name
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="horizon-manager", description="External Horizon Manager command surface.")
+    parser.add_argument("--format", choices=("text", "json"), default="text", help="Output format.")
+    parser.add_argument("--corpus", choices=corpus_names(), default=default_corpus().name, help="Managed horizon corpus.")
+    parser.add_argument("--repo-root", default=None, help="Repository root. Defaults to the selected corpus root.")
+    parser.add_argument("--horizons-dir", default=None, help="Override the selected corpus Horizon README directory.")
+    parser.add_argument("--generated-dir", default=None, help="Override the selected corpus generated horizon_* artifact directory.")
+
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    subparsers.add_parser("corpora", help="List configured horizon corpora.")
+
+    state = subparsers.add_parser("state", help="Parse horizon README state.")
+    state.add_argument("--write", action="store_true", help="Write horizon_state.json.")
+
+    doctor = subparsers.add_parser("doctor", help="Run horizon document diagnostics.")
+    doctor.add_argument("--write", action="store_true", help="Write horizon_doctor.json.")
+
+    conflicts = subparsers.add_parser("conflicts", help="Build horizon conflict matrix.")
+    conflicts.add_argument("--write", action="store_true", help="Write horizon_conflicts.json.")
+
+    next_cmd = subparsers.add_parser("next", help="Recommend next horizons.")
+    next_cmd.add_argument("--limit", type=int, default=None, help="Maximum recommendations to emit.")
+    next_cmd.add_argument("--write", action="store_true", help="Write horizon_next.json.")
+
+    claim = subparsers.add_parser("claim", help="Claim a horizon lock.")
+    claim.add_argument("horizon")
+    claim.add_argument("--agent", required=True)
+    claim.add_argument("--ttl", type=int, default=7200, help="Lock TTL in seconds.")
+    claim.add_argument("--dry-run", action="store_true", help="Validate without writing horizon_locks.json.")
+
+    release = subparsers.add_parser("release", help="Release a horizon lock.")
+    release.add_argument("horizon")
+    release.add_argument("--agent", required=True)
+    release.add_argument("--dry-run", action="store_true", help="Validate without writing horizon_locks.json.")
+
+    events = subparsers.add_parser("events", help="Summarize horizon event log.")
+    events.add_argument("--tail", type=int, default=10, help="Number of latest events to include.")
+
+    subparsers.add_parser("preflight", help="Delegate to H46 preflight when available.")
+    subparsers.add_parser("land", help="Delegate to H47 safe-land when available.")
+    subparsers.add_parser("render", help="Delegate to H48 renderer when available.")
+
+    hook = subparsers.add_parser("hook", help="Run daemon-independent local horizon hook checks.")
+    hook.add_argument("--mode", choices=("pre_commit", "pre_push", "manual"), default="manual")
+    hook.add_argument("--changed-path", action="append", default=None, help="Changed path to check. Defaults to git diff.")
+    hook.add_argument("--claim", action="append", default=None, help="Claimed horizon id. Repeatable.")
+    hook.add_argument("--agent", default="local-hook", help="Agent id used for H46 preflight checks.")
+    hook.add_argument("--no-inventory-only", action="store_true", help="Block inventory-only churn.")
+    return parser
+
+
+def run_command(args: argparse.Namespace, io: CommandIO | None = None, context: CommandContext | None = None) -> CommandResult:
+    del io
+    ctx = context or _context_from_args(args)
+    handlers: dict[str, Callable[[argparse.Namespace, CommandContext], CommandResult]] = {
+        "state": _run_state,
+        "corpora": _run_corpora,
+        "doctor": _run_doctor,
+        "conflicts": _run_conflicts,
+        "next": _run_next,
+        "claim": _run_claim,
+        "release": _run_release,
+        "events": _run_events,
+        "hook": _run_hook,
+        "preflight": _run_delegated_stub,
+        "land": _run_delegated_stub,
+        "render": _run_delegated_stub,
+    }
+    handler = handlers.get(args.command)
+    if handler is None:
+        return CommandResult(False, str(args.command), message="unknown command", exit_code=ExitCode.BAD_INVOCATION)
+    try:
+        return handler(args, ctx)
+    except ValueError as exc:
+        return CommandResult(False, args.command, message=str(exc), exit_code=ExitCode.VALIDATION_FAILURE)
+    except Exception as exc:  # pragma: no cover - defensive process boundary
+        return CommandResult(False, args.command, message=str(exc), exit_code=ExitCode.INTERNAL_ERROR)
+
+
+def emit_result(result: CommandResult, output_format: str = "text", io: CommandIO | None = None) -> None:
+    streams = io or CommandIO()
+    if output_format == "json":
+        print(json.dumps(result.to_dict(), ensure_ascii=False, indent=2, sort_keys=True), file=streams.stdout)
+        return
+    stream = streams.stdout if result.ok else streams.stderr
+    status = "ok" if result.ok else "error"
+    print(f"{status}: {result.command}: {result.message or _default_message(result)}", file=stream)
+    for diagnostic in result.diagnostics:
+        print(f"- {diagnostic}", file=stream)
+
+
+def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    if not argv:
+        from .interactive import run_interactive_main
+
+        return run_interactive_main()
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    io = CommandIO()
+    result = run_command(args, io=io)
+    emit_result(result, args.format, io)
+    return int(result.exit_code)
+
+
+def _run_state(args: argparse.Namespace, ctx: CommandContext) -> CommandResult:
+    from .parser import parse_horizon_tree
+
+    state = parse_horizon_tree(ctx.horizons_dir)
+    if args.write:
+        state.write_json(ctx.path("horizon_state.json"))
+    return CommandResult(
+        True,
+        "state",
+        data={"horizon_count": len(state.records), "warning_count": len(state.warnings), "state": state.to_dict()},
+        message=f"{len(state.records)} horizons parsed",
+    )
+
+
+def _run_corpora(args: argparse.Namespace, ctx: CommandContext) -> CommandResult:
+    del args
+    rows = []
+    for corpus in known_corpora():
+        payload = corpus.to_dict()
+        payload["exists"] = corpus.horizons_dir.exists()
+        payload["selected"] = corpus.horizons_dir == ctx.horizons_dir
+        rows.append(payload)
+    return CommandResult(
+        True,
+        "corpora",
+        data={"corpora": rows, "selected": str(ctx.horizons_dir)},
+        message=f"{len(rows)} corpora",
+    )
+
+
+def _run_doctor(args: argparse.Namespace, ctx: CommandContext) -> CommandResult:
+    from .doctor import run_doctor
+    from .parser import parse_horizon_tree
+
+    state = parse_horizon_tree(ctx.horizons_dir)
+    report = run_doctor(state, repo_root=ctx.repo_root, generated_paths=_generated_files(ctx))
+    if args.write:
+        ctx.path("horizon_doctor.json").write_text(report.to_json(), encoding="utf-8")
+    exit_code = ExitCode.SUCCESS if report.ok else ExitCode.VALIDATION_FAILURE
+    return CommandResult(
+        report.ok,
+        "doctor",
+        data=report.to_dict(),
+        message="diagnostics passed" if report.ok else "diagnostics found errors",
+        exit_code=exit_code,
+    )
+
+
+def _run_conflicts(args: argparse.Namespace, ctx: CommandContext) -> CommandResult:
+    from .conflicts import build_conflict_matrix
+    from .parser import parse_horizon_tree
+
+    state = parse_horizon_tree(ctx.horizons_dir)
+    matrix = build_conflict_matrix(state)
+    if args.write:
+        matrix.write_json(ctx.path("horizon_conflicts.json"))
+    return CommandResult(
+        True,
+        "conflicts",
+        data=matrix.to_dict(),
+        message=f"{len(matrix.conflicts)} conflicts, {len(matrix.blocking_pairs)} blocking pairs",
+    )
+
+
+def _run_next(args: argparse.Namespace, ctx: CommandContext) -> CommandResult:
+    from .conflicts import build_conflict_matrix
+    from .doctor import run_doctor
+    from .locks import LockStore
+    from .next import recommend_next
+    from .parser import parse_horizon_tree
+
+    state = parse_horizon_tree(ctx.horizons_dir)
+    doctor = run_doctor(state, repo_root=ctx.repo_root, generated_paths=_generated_files(ctx))
+    conflicts = build_conflict_matrix(state)
+    locks = LockStore(ctx.path("horizon_locks.json")).load()
+    report = recommend_next(state, doctor, conflicts, locks, now=ctx.now or None, limit=args.limit)
+    if args.write:
+        ctx.path("horizon_next.json").write_text(report.to_json(), encoding="utf-8")
+    return CommandResult(
+        True,
+        "next",
+        data=report.to_dict(),
+        message=f"{len(report.recommendations)} recommendations",
+    )
+
+
+def _run_claim(args: argparse.Namespace, ctx: CommandContext) -> CommandResult:
+    from .conflicts import build_conflict_matrix
+    from .locks import LockStore, claim_horizon
+    from .parser import parse_horizon_tree
+
+    state = parse_horizon_tree(ctx.horizons_dir)
+    conflicts = build_conflict_matrix(state)
+    store = LockStore(ctx.path("horizon_locks.json"))
+    snapshot = store.load()
+    next_snapshot, decision = claim_horizon(state, conflicts, snapshot, args.horizon, args.agent, args.ttl, now=ctx.now or None)
+    if decision.ok and not args.dry_run:
+        store.save(next_snapshot)
+    exit_code = ExitCode.SUCCESS if decision.ok else _lock_failure_code(decision.blockers)
+    return CommandResult(
+        decision.ok,
+        "claim",
+        data={"decision": decision.to_dict(), "snapshot": next_snapshot.to_dict(), "dry_run": bool(args.dry_run)},
+        message="claim accepted" if decision.ok else "claim rejected",
+        exit_code=exit_code,
+        diagnostics=decision.blockers or decision.warnings,
+    )
+
+
+def _run_release(args: argparse.Namespace, ctx: CommandContext) -> CommandResult:
+    from .locks import LockStore, release_horizon
+
+    store = LockStore(ctx.path("horizon_locks.json"))
+    snapshot = store.load()
+    next_snapshot, decision = release_horizon(snapshot, args.horizon, args.agent, now=ctx.now or None)
+    if decision.ok and not args.dry_run:
+        store.save(next_snapshot)
+    exit_code = ExitCode.SUCCESS if decision.ok else ExitCode.MISSING_CLAIM
+    return CommandResult(
+        decision.ok,
+        "release",
+        data={"decision": decision.to_dict(), "snapshot": next_snapshot.to_dict(), "dry_run": bool(args.dry_run)},
+        message="release accepted" if decision.ok else "release rejected",
+        exit_code=exit_code,
+        diagnostics=decision.blockers or decision.warnings,
+    )
+
+
+def _run_events(args: argparse.Namespace, ctx: CommandContext) -> CommandResult:
+    path = ctx.path("horizon_events.jsonl")
+    events = []
+    if path.exists():
+        events = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    tail = events[-max(args.tail, 0) :] if args.tail else []
+    return CommandResult(
+        True,
+        "events",
+        data={"event_count": len(events), "events": tail},
+        message=f"{len(events)} events",
+    )
+
+
+def _run_hook(args: argparse.Namespace, ctx: CommandContext) -> CommandResult:
+    from .conflicts import build_conflict_matrix
+    from .doctor import run_doctor
+    from .hooks import HookContext, collect_git_changed_paths, render_hook_report, run_hook
+    from .locks import LockStore
+    from .parser import parse_horizon_tree
+
+    changed = tuple(Path(path) for path in (args.changed_path or ())) or collect_git_changed_paths(args.mode, ctx.repo_root)
+    state = parse_horizon_tree(ctx.horizons_dir)
+    locks = LockStore(ctx.path("horizon_locks.json")).load()
+    doctor = run_doctor(state, repo_root=ctx.repo_root, generated_paths=_generated_files(ctx))
+    conflicts = build_conflict_matrix(state)
+    report = run_hook(
+        args.mode,
+        HookContext(
+            changed_paths=changed,
+            claimed_horizons=tuple(args.claim or ()),
+            agent_id=args.agent,
+            state=state,
+            locks=locks,
+            doctor_report=doctor,
+            conflict_matrix=conflicts,
+            now=ctx.now or None,
+            allow_inventory_only=not args.no_inventory_only,
+        ),
+    )
+    exit_code = ExitCode.SUCCESS if report.ok else ExitCode.VALIDATION_FAILURE
+    return CommandResult(
+        report.ok,
+        "hook",
+        data={"report": report.to_dict(), "rendered": render_hook_report(report, "text")},
+        message="hook checks passed" if report.ok else "hook checks blocked",
+        exit_code=exit_code,
+        diagnostics=report.diagnostics,
+    )
+
+
+def _run_delegated_stub(args: argparse.Namespace, ctx: CommandContext) -> CommandResult:
+    del ctx
+    command = str(args.command)
+    module_by_command = {"preflight": "H46", "land": "H47", "render": "H48"}
+    horizon = module_by_command[command]
+    return CommandResult(
+        False,
+        command,
+        data={"delegate": horizon},
+        message=f"{command} is waiting for {horizon} implementation",
+        exit_code=ExitCode.VALIDATION_FAILURE,
+        diagnostics=(f"delegate_not_ready:{horizon}",),
+    )
+
+
+def _context_from_args(args: argparse.Namespace) -> CommandContext:
+    repo_root = Path(args.repo_root) if args.repo_root else None
+    horizons_dir = Path(args.horizons_dir) if args.horizons_dir else None
+    generated_dir = Path(args.generated_dir) if args.generated_dir else None
+    return CommandContext(
+        repo_root=repo_root,
+        corpus_name=getattr(args, "corpus", None),
+        horizons_dir=horizons_dir,
+        generated_dir=generated_dir,
+    )
+
+
+def _generated_files(ctx: CommandContext) -> tuple[str, ...]:
+    assert ctx.generated_dir is not None
+    return tuple(str(path.relative_to(ctx.repo_root)) if path.is_relative_to(ctx.repo_root) else str(path) for path in sorted(ctx.generated_dir.glob("horizon_*.json*")))
+
+
+def _lock_failure_code(blockers: tuple[str, ...]) -> ExitCode:
+    if any(item.startswith(("conflict:", "lock:")) for item in blockers):
+        return ExitCode.CONFLICT
+    if any(item.startswith(("not_active:", "owner:")) for item in blockers):
+        return ExitCode.MISSING_CLAIM
+    return ExitCode.VALIDATION_FAILURE
+
+
+def _default_message(result: CommandResult) -> str:
+    if "count" in result.data:
+        return str(result.data["count"])
+    return "completed"
+
+
+def _stable_value(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {str(key): _stable_value(value[key]) for key in sorted(value)}
+    if isinstance(value, (list, tuple)):
+        return [_stable_value(item) for item in value]
+    return value
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
