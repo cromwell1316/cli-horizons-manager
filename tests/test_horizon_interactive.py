@@ -20,10 +20,11 @@ def test_menu_lines_match_keyboard_first_surface() -> None:
 
     text = "\n".join(lines)
     assert "HORIZON MANAGER" in text
-    assert "-->" in text
+    assert "▌" in text
     assert "[1] Overview" in text
     assert "digits/shortcuts" in text
     assert "Esc/q" in text
+    assert "\033[48;5;0m" in text
 
 
 def test_interactive_main_can_exit_from_selector() -> None:
@@ -39,7 +40,8 @@ def test_default_menu_runner_shows_active_corpus(monkeypatch, capsys) -> None:
 
     output = capsys.readouterr().out
     assert selected == 8
-    assert "Active corpus: horizon-manager - Horizon Manager management horizons" in output
+    assert "Active corpus:" in output
+    assert "horizon-manager" in output
     assert "Corpus state: horizons=" in output
     assert "Locks: active=" in output
     assert "Doctor:" in output
@@ -53,7 +55,7 @@ def test_operator_status_lines_are_script_friendly(monkeypatch) -> None:
     lines = operator_status_lines(CommandContext(corpus_name="horizon-manager"))
 
     assert all("\n" not in line for line in lines)
-    assert any(line.startswith("Active corpus: horizon-manager") for line in lines)
+    assert any("Active corpus:" in line and "horizon-manager" in line for line in lines)
     assert "Worktree: clean" in lines
 
 

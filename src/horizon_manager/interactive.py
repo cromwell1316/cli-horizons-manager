@@ -6,6 +6,8 @@ import sys
 import termios
 import tty
 from collections.abc import Callable, Sequence
+import re
+import shutil
 import subprocess
 from typing import Any
 
@@ -15,9 +17,14 @@ from .corpus import known_corpora
 
 CLR_RESET = "\033[0m"
 CLR_BOLD = "\033[1m"
+CLR_RED = "\033[31m"
+CLR_BRIGHT_RED = "\033[38;5;196m"
+CLR_DARK_RED = "\033[38;5;88m"
 CLR_CYAN = "\033[36m"
 CLR_WHITE = "\033[37m"
 CLR_DIM = "\033[90m"
+CLR_BG_BLACK = "\033[48;5;0m"
+_ANSI_RE = re.compile(r"\033\[[0-9;?]*[A-Za-z]")
 
 
 MenuRunner = Callable[..., int]
@@ -25,30 +32,72 @@ MenuRunner = Callable[..., int]
 
 def clear_screen(stdout=None) -> None:
     stream = sys.stdout if stdout is None else stdout
-    stream.write("\033[H\033[J")
+    stream.write(f"\033[?25h{CLR_BG_BLACK}\033[H\033[2J\033[3J")
     stream.flush()
 
 
-def render_menu_lines(options: Sequence[str], title: str = "", selected_idx: int = 0, pre_lines: Sequence[str] | None = None) -> list[str]:
-    lines = [
-        f"{CLR_BOLD}{CLR_CYAN}{title or 'HORIZON MANAGER'}{CLR_RESET}",
-        "",
+def visible_len(text: str) -> int:
+    return len(_ANSI_RE.sub("", str(text)))
+
+
+def terminal_size(fallback: tuple[int, int] = (120, 30)) -> tuple[int, int]:
+    size = shutil.get_terminal_size(fallback)
+    return size.columns, size.lines
+
+
+def themed_line(text: str = "", width: int | None = None) -> str:
+    width = max(1, width or terminal_size()[0])
+    body = str(text).replace(CLR_RESET, CLR_RESET + CLR_BG_BLACK)
+    padding = " " * max(0, width - visible_len(body))
+    return f"{CLR_BG_BLACK}{body}{padding}{CLR_RESET}"
+
+
+def themed_screen_lines(lines: Sequence[str], width: int | None = None, height: int | None = None, top_padding: int = 1, left_padding: int | None = None) -> list[str]:
+    term_width, term_height = terminal_size()
+    width = max(1, width or term_width)
+    height = max(1, height or term_height)
+    if left_padding is None:
+        left_padding = 4 if width >= 100 else 2
+    left = " " * max(0, min(left_padding, max(0, width - 1)))
+    themed = [themed_line(width=width) for _ in range(max(0, top_padding))]
+    for line in lines:
+        themed.append(themed_line(left + str(line), width))
+    while len(themed) < height:
+        themed.append(themed_line(width=width))
+    return themed[:height]
+
+
+def header_lines(title: str = "", width: int | None = None) -> list[str]:
+    term_width = terminal_size()[0]
+    label = title or "HORIZON MANAGER"
+    width = width or min(max(42, visible_len(label) + 18), term_width)
+    width = max(1, min(width, term_width))
+    divider = "━" * width
+    return [
+        f"{CLR_BOLD}{CLR_BRIGHT_RED}HORIZON MANAGER{CLR_RESET}{CLR_WHITE} {label if label != 'HORIZON MANAGER' else ''}{CLR_RESET}".rstrip(),
+        f"{CLR_DARK_RED}{divider}{CLR_RESET}",
     ]
+
+
+def render_menu_lines(options: Sequence[str], title: str = "", selected_idx: int = 0, pre_lines: Sequence[str] | None = None) -> list[str]:
+    width = terminal_size()[0]
+    header_width = min(width, max(56, visible_len(title or "HORIZON MANAGER") + 18))
+    lines = [*header_lines(title or "HORIZON MANAGER", width=header_width), ""]
     if pre_lines:
         lines.extend(str(line) for line in pre_lines)
         lines.append("")
     for idx, option in enumerate(options):
         if idx == selected_idx:
-            lines.append(f"  {CLR_BOLD}{CLR_CYAN}--> \033[40m\033[1;37m{option}{CLR_RESET}")
+            lines.append(f"{CLR_BRIGHT_RED}▌{CLR_RESET} {CLR_BOLD}{CLR_WHITE}{option}{CLR_RESET}")
         else:
-            lines.append(f"      {CLR_DIM}{option}{CLR_RESET}")
+            lines.append(f"  {CLR_DIM}{option}{CLR_RESET}")
     lines.append("")
     lines.append(
-        f"{CLR_WHITE}Use {CLR_BOLD}up/down{CLR_RESET}{CLR_WHITE}, digits/shortcuts, "
-        f"{CLR_BOLD}Enter{CLR_RESET}{CLR_WHITE} to confirm, "
-        f"{CLR_BOLD}Esc/q{CLR_RESET}{CLR_WHITE} to go back.{CLR_RESET}"
+        f"{CLR_DIM}↑/↓ move   digits/shortcuts   "
+        f"{CLR_BRIGHT_RED}Enter{CLR_RESET}{CLR_BG_BLACK}{CLR_DIM} select   "
+        f"{CLR_RED}Esc/q{CLR_RESET}{CLR_BG_BLACK}{CLR_DIM} back{CLR_RESET}"
     )
-    return lines
+    return themed_screen_lines(lines)
 
 
 def run_menu(options: Sequence[str], title: str = "", shortcuts: dict[str, int] | None = None, pre_lines: Sequence[str] | None = None) -> int:
@@ -192,12 +241,12 @@ def _run_direct(argv: list[str], context: CommandContext) -> int:
 
 
 def operator_status_lines(context: CommandContext) -> tuple[str, ...]:
-    """Return deterministic, script-friendly status lines for the menu header."""
+    """Return deterministic status lines for the themed menu header."""
 
     lines = [
-        "Keyboard-first mission control for configured horizon corpora.",
-        f"Active corpus: {context.corpus_name} - {context.corpus_title}",
-        f"Horizons: {context.horizons_dir}",
+        f"{CLR_WHITE}Keyboard-first mission control for configured horizon corpora.{CLR_RESET}",
+        f"Active corpus: {CLR_BRIGHT_RED}{context.corpus_name}{CLR_RESET}{CLR_BG_BLACK}{CLR_DIM} - {context.corpus_title}{CLR_RESET}",
+        f"{CLR_DIM}Horizons:{CLR_RESET}{CLR_BG_BLACK} {context.horizons_dir}",
     ]
     try:
         from .doctor import run_doctor
@@ -208,15 +257,16 @@ def operator_status_lines(context: CommandContext) -> tuple[str, ...]:
         status_text = ", ".join(f"{key}={value}" for key, value in _status_counts(state.records).items()) or "none"
         locks = LockStore(context.path("horizon_locks.json")).load()
         doctor = run_doctor(state, repo_root=context.repo_root, generated_paths=())
+        doctor_state = f"{CLR_BRIGHT_RED}ok{CLR_RESET}" if doctor.ok else f"{CLR_RED}errors{CLR_RESET}"
         lines.extend(
             (
                 f"Corpus state: horizons={len(state.records)} statuses={status_text}",
                 f"Locks: active={len(locks.active_locks)} total={len(locks.locks)}",
-                f"Doctor: {'ok' if doctor.ok else 'errors'} diagnostics={len(doctor.diagnostics)}",
+                f"Doctor: {doctor_state}{CLR_BG_BLACK} diagnostics={len(doctor.diagnostics)}{CLR_RESET}",
             )
         )
     except Exception as exc:  # pragma: no cover - defensive operator surface
-        lines.append(f"Corpus state: unavailable ({exc})")
+        lines.append(f"{CLR_RED}Corpus state unavailable:{CLR_RESET}{CLR_BG_BLACK} {exc}")
     lines.append(f"Worktree: {_dirty_status(context)}")
     return tuple(lines)
 
@@ -287,8 +337,8 @@ def _dirty_status(context: CommandContext) -> str:
         return "unknown"
     rows = tuple(line for line in result.stdout.splitlines() if line.strip())
     if not rows:
-        return "clean"
-    return f"dirty paths={len(rows)}"
+        return f"{CLR_BRIGHT_RED}clean{CLR_RESET}"
+    return f"{CLR_RED}dirty{CLR_RESET}{CLR_BG_BLACK} paths={len(rows)}"
 
 
 def _count_values(values: Sequence[str] | Any) -> dict[str, int]:
