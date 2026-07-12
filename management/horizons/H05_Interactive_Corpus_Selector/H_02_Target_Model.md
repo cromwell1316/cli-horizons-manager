@@ -15,5 +15,5 @@ Make the keyboard-first console safe for multi-corpus operation.
 
 ## Owned Implementation Surface
 
-- management/subprojects/horizon-manager/src/horizon_manager/interactive.py
-- management/subprojects/horizon-manager/tests/test_horizon_interactive.py
+- src/horizon_manager/interactive.py
+- tests/test_horizon_interactive.py

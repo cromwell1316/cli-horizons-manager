@@ -8,6 +8,7 @@ import tty
 from collections.abc import Callable, Sequence
 
 from .cli import CommandContext, build_parser, emit_result, run_command
+from .corpus import known_corpora
 
 
 CLR_RESET = "\033[0m"
@@ -17,7 +18,7 @@ CLR_WHITE = "\033[37m"
 CLR_DIM = "\033[90m"
 
 
-MenuRunner = Callable[[Sequence[str]], int]
+MenuRunner = Callable[..., int]
 
 
 def clear_screen(stdout=None) -> None:
@@ -110,13 +111,15 @@ def run_interactive_main(ctx: CommandContext | None = None, menu_runner: MenuRun
             "[7] Help",
             "[x] Exit",
         ]
-        selected = choose(options)
+        selected = _choose(choose, options, context, title="HORIZON MANAGER")
         if selected in {-1, 8}:
             clear_screen()
             print("Exiting Horizon Manager.")
             return 0
         if selected == 0:
-            _run_direct(["corpora"], context)
+            next_context = _select_corpus(context, choose)
+            if next_context is not None:
+                context = next_context
         elif selected == 1:
             _run_direct(["next", "--limit", "8"], context)
         elif selected == 2:
@@ -138,17 +141,46 @@ def run_interactive_main(ctx: CommandContext | None = None, menu_runner: MenuRun
         elif selected == 6:
             _run_direct(["hook", "--mode", "manual"], context)
         elif selected == 7:
-            _run_direct(["--help"], context)
+            _show_help()
         _pause()
 
 
-def _default_menu_runner(options: Sequence[str]) -> int:
+def _default_menu_runner(options: Sequence[str], context: CommandContext, title: str = "HORIZON MANAGER") -> int:
     return run_menu(
         options,
-        "HORIZON MANAGER",
+        title,
         shortcuts={"0": 0, "x": 8},
-        pre_lines=("Keyboard-first mission control for configured horizon corpora.",),
+        pre_lines=(
+            "Keyboard-first mission control for configured horizon corpora.",
+            f"Active corpus: {context.corpus_name}",
+            f"Horizons: {context.horizons_dir}",
+        ),
     )
+
+
+def _choose(choose: MenuRunner, options: Sequence[str], context: CommandContext, *, title: str) -> int:
+    try:
+        return int(choose(options, context, title))
+    except TypeError:
+        return int(choose(options))
+
+
+def _select_corpus(context: CommandContext, choose: MenuRunner) -> CommandContext | None:
+    corpora = known_corpora()
+    options = [f"[{idx + 1}] {corpus.name} - {corpus.title}" for idx, corpus in enumerate(corpora)]
+    options.append("[x] Back")
+    selected = _choose(choose, options, context, title="SELECT CORPUS")
+    if selected in {-1, len(options) - 1}:
+        return None
+    if 0 <= selected < len(corpora):
+        corpus = corpora[selected]
+        print(f"Selected corpus: {corpus.name}")
+        return CommandContext(corpus_name=corpus.name)
+    return None
+
+
+def _show_help() -> None:
+    print(build_parser().format_help())
 
 
 def _run_direct(argv: list[str], context: CommandContext) -> int:

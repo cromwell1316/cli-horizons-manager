@@ -2,10 +2,10 @@
 
 Owner: agent-toolchain
 Source of Truth: management/horizons/H05_Interactive_Corpus_Selector/README.md
-Lifecycle: planned
+Lifecycle: completed
 Document Class: horizon
 
-Status: planned (Wave 2).
+Status: implemented (Wave 2).
 
 ## Purpose
 
@@ -31,9 +31,16 @@ Make the keyboard-first console safe for multi-corpus operation.
 
 ## Owned Files (EXCLUSIVE)
 
-- `management/subprojects/horizon-manager/src/horizon_manager/interactive.py`
-- `management/subprojects/horizon-manager/tests/test_horizon_interactive.py`
+- `src/horizon_manager/interactive.py`
+- `tests/test_horizon_interactive.py`
 
 ## Concurrency
 
 Wave 2. Needs: H03/H04.
+
+## Completion Notes
+
+- The main interactive menu shows active corpus and horizons directory in the header.
+- Menu item `[0] Corpora` opens an in-session selector and switches `CommandContext`.
+- Help is rendered with `build_parser().format_help()` and returns to the interactive
+  loop instead of terminating through argparse `SystemExit`.
