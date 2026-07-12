@@ -2,10 +2,10 @@
 
 Owner: agent-toolchain
 Source of Truth: management/horizons/H08_Hook_Active_Locks_As_Claims/README.md
-Lifecycle: planned
+Lifecycle: completed
 Document Class: horizon
 
-Status: planned (Wave 4).
+Status: implemented (Wave 4).
 
 ## Purpose
 
@@ -31,9 +31,15 @@ Make Hook Check treat active locks for the current agent as effective claims.
 
 ## Owned Files (EXCLUSIVE)
 
-- `management/subprojects/horizon-manager/src/horizon_manager/hooks.py`
-- `management/subprojects/horizon-manager/src/horizon_manager/cli.py`
-- `management/subprojects/horizon-manager/tests/test_horizon_hooks.py`
+- `src/horizon_manager/hooks.py`
+- `tests/test_horizon_hooks.py`
+- `tests/test_horizon_interactive.py`
+
+## Completion Notes
+
+- Hook checks now merge explicit `--claim` values with active, unexpired lock-store claims owned by the same `agent_id`.
+- Foreign active locks do not count as claims for the current agent and still block owned-file edits.
+- CLI hook flow uses `horizon_locks.json` automatically, and interactive Hook Check delegates to that CLI path without requiring manual claim arguments.
 
 ## Concurrency
 

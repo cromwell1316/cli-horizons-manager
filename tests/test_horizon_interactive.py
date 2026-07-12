@@ -78,6 +78,19 @@ def test_interactive_help_returns_to_loop(monkeypatch, capsys) -> None:
     assert pauses == ["pause"]
 
 
+def test_interactive_hook_check_delegates_to_cli_without_explicit_claim(monkeypatch) -> None:
+    selections = iter([6, 8])
+    direct_calls = []
+
+    monkeypatch.setattr("horizon_manager.interactive._run_direct", lambda argv, context: direct_calls.append((tuple(argv), context.corpus_name)) or 0)
+    monkeypatch.setattr("horizon_manager.interactive._pause", lambda: None)
+
+    result = run_interactive_main(CommandContext(corpus_name="horizon-manager"), menu_runner=lambda options, context, title: next(selections))
+
+    assert result == 0
+    assert direct_calls == [(("hook", "--mode", "manual"), "horizon-manager")]
+
+
 def test_cli_main_without_args_delegates_to_interactive(monkeypatch=None) -> None:
     calls = []
 
@@ -105,4 +118,5 @@ def test_cli_main_without_args_delegates_to_interactive(monkeypatch=None) -> Non
 if __name__ == "__main__":
     test_menu_lines_match_keyboard_first_surface()
     test_interactive_main_can_exit_from_selector()
+    test_interactive_hook_check_delegates_to_cli_without_explicit_claim()
     test_cli_main_without_args_delegates_to_interactive()

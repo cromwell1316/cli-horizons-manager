@@ -9,6 +9,7 @@ from pathlib import Path
 import subprocess
 from typing import Any, Iterable
 
+from .locks import prune_stale_locks
 from .model import HorizonId, HorizonState
 from .preflight import PreflightContext, PreflightMode, run_preflight
 
@@ -107,7 +108,7 @@ def run_hook(mode: HookMode | str, context: HookContext) -> HookReport:
     changes = tuple(_hook_change(path, context) for path in context.changed_paths)
     horizon_ids = tuple(sorted({change.horizon_id for change in changes if change.horizon_id}))
     diagnostics = _diagnostics(hook_mode, context, changes, horizon_ids)
-    diagnostics.extend(_preflight_diagnostics(context, horizon_ids))
+    diagnostics.extend(_preflight_diagnostics(context, horizon_ids, _effective_claimed_horizons(context)))
     if _inventory_only(changes) and context.allow_inventory_only:
         diagnostics = [item for item in diagnostics if not item.startswith(("stale inventory:", "unrelated paths"))]
 
@@ -224,7 +225,7 @@ def _diagnostics(
     horizon_ids: tuple[str, ...],
 ) -> list[str]:
     diagnostics: list[str] = []
-    claimed = set(context.claimed_horizons)
+    claimed = set(_effective_claimed_horizons(context))
     classifications = {change.classification for change in changes}
 
     if HookChangeClassification.DETECTOR_OUTPUT in classifications:
@@ -246,12 +247,12 @@ def _diagnostics(
     return diagnostics
 
 
-def _preflight_diagnostics(context: HookContext, horizon_ids: tuple[str, ...]) -> list[str]:
+def _preflight_diagnostics(context: HookContext, horizon_ids: tuple[str, ...], claimed_horizons: tuple[str, ...]) -> list[str]:
     if context.state is None:
         return []
     diagnostics: list[str] = []
     for horizon_id in horizon_ids:
-        if horizon_id not in context.claimed_horizons:
+        if horizon_id not in claimed_horizons:
             continue
         report = run_preflight(
             PreflightContext(
@@ -270,6 +271,17 @@ def _preflight_diagnostics(context: HookContext, horizon_ids: tuple[str, ...]) -
             failed = ", ".join(check.id for check in report.checks if check.status.value == "fail")
             diagnostics.append(f"preflight failed for {horizon_id}: {failed}")
     return diagnostics
+
+
+def _effective_claimed_horizons(context: HookContext) -> tuple[str, ...]:
+    claims = {str(HorizonId(item)) for item in context.claimed_horizons}
+    if context.locks is None:
+        return tuple(sorted(claims, key=lambda item: HorizonId(item).number))
+    snapshot = prune_stale_locks(context.locks, now=context.now)
+    for lock in snapshot.active_locks:
+        if lock.agent_id == context.agent_id and not lock.is_expired(context.now):
+            claims.add(str(lock.horizon_id))
+    return tuple(sorted(claims, key=lambda item: HorizonId(item).number))
 
 
 def _inventory_only(changes: tuple[HookChange, ...]) -> bool:

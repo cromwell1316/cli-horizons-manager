@@ -15,6 +15,13 @@ Make Hook Check treat active locks for the current agent as effective claims.
 
 ## Owned Implementation Surface
 
-- management/subprojects/horizon-manager/src/horizon_manager/hooks.py
-- management/subprojects/horizon-manager/src/horizon_manager/cli.py
-- management/subprojects/horizon-manager/tests/test_horizon_hooks.py
+- src/horizon_manager/hooks.py
+- tests/test_horizon_hooks.py
+- tests/test_horizon_interactive.py
+
+## Implemented Model
+
+- Effective hook claims are the deterministic union of explicit `--claim` values and active lock-store claims for the current agent.
+- Expired or foreign-owned active locks are not accepted as current-agent claims.
+- Preflight checks use the same effective claim set so hook diagnostics and landing scope checks stay aligned.
+- Interactive Hook Check continues to call `hook --mode manual`, relying on the CLI to read lock-store claims.
