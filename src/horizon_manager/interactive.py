@@ -27,6 +27,7 @@ CLR_DIM = "\033[90m"
 CLR_MUTED = "\033[38;5;245m"
 CLR_BG_BLACK = "\033[48;5;0m"
 _ANSI_RE = re.compile(r"\033\[[0-9;?]*[A-Za-z]")
+STATUS_LABEL_WIDTH = 8
 
 
 MenuRunner = Callable[..., int]
@@ -249,8 +250,8 @@ def operator_status_lines(context: CommandContext) -> tuple[str, ...]:
     lines = [
         f"{CLR_WHITE}Keyboard-first mission control for configured horizon corpora.{CLR_RESET}",
         f"{CLR_DIM}Status{CLR_RESET}",
-        f"{CLR_WHITE}Corpus:{CLR_RESET}{CLR_BG_BLACK} {CLR_BRIGHT_RED}{context.corpus_name}{CLR_RESET}{CLR_BG_BLACK}{CLR_MUTED} - {context.corpus_title}{CLR_RESET}",
-        f"{CLR_WHITE}Horizons:{CLR_RESET}{CLR_BG_BLACK} {_compact_path(context.horizons_dir)}",
+        _status_line("Corpus", f"{CLR_BRIGHT_RED}{context.corpus_name}{CLR_RESET}{CLR_BG_BLACK}{CLR_MUTED} - {context.corpus_title}{CLR_RESET}"),
+        _status_line("Horizons", _compact_path(context.horizons_dir)),
     ]
     try:
         from .doctor import run_doctor
@@ -265,16 +266,16 @@ def operator_status_lines(context: CommandContext) -> tuple[str, ...]:
         doctor_state = f"{CLR_BRIGHT_RED}ok{CLR_RESET}" if doctor.ok else f"{CLR_RED}blocked{CLR_RESET}"
         lines.extend(
             (
-                f"{CLR_WHITE}Horizons:{CLR_RESET}{CLR_BG_BLACK} total={len(state.records)} | {status_text}",
-                f"{CLR_WHITE}Locks:{CLR_RESET}{CLR_BG_BLACK} active={len(locks.active_locks)} | total={len(locks.locks)}",
-                f"{CLR_WHITE}Doctor:{CLR_RESET}{CLR_BG_BLACK} {doctor_state}{CLR_BG_BLACK} | diagnostics={len(doctor.diagnostics)}{CLR_RESET}",
+                _status_line("Horizons", f"total={len(state.records)} | {status_text}"),
+                _status_line("Locks", f"active={len(locks.active_locks)} | total={len(locks.locks)}"),
+                _status_line("Doctor", f"{doctor_state}{CLR_BG_BLACK} | diagnostics={len(doctor.diagnostics)}{CLR_RESET}"),
             )
         )
     except Exception as exc:  # pragma: no cover - defensive operator surface
         lines.append(f"{CLR_RED}Corpus state unavailable:{CLR_RESET}{CLR_BG_BLACK} {exc}")
     worktree = _dirty_status(context)
-    lines.append(f"{CLR_WHITE}Worktree:{CLR_RESET}{CLR_BG_BLACK} {worktree}")
-    lines.append(f"{CLR_DIM}Next:{CLR_RESET}{CLR_BG_BLACK} {_next_action_hint(worktree)}")
+    lines.append(_status_line("Worktree", worktree))
+    lines.append(_status_line("Next", _next_action_hint(worktree), label_color=CLR_DIM))
     return tuple(lines)
 
 
@@ -342,6 +343,10 @@ def _operator_status_summary(counts: dict[str, int]) -> str:
     parts = [f"{key}={counts[key]}" for key in preferred if key in counts]
     parts.extend(f"{key}={value}" for key, value in counts.items() if key not in preferred)
     return " | ".join(parts)
+
+
+def _status_line(label: str, value: str, *, label_color: str = CLR_WHITE) -> str:
+    return f"{label_color}{label:<{STATUS_LABEL_WIDTH}}:{CLR_RESET}{CLR_BG_BLACK} {value}"
 
 
 def _compact_path(path: Any, *, max_width: int | None = None) -> str:

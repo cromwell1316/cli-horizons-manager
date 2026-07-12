@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 import sys
 
 
@@ -13,6 +14,8 @@ sys.path.insert(0, str(PACKAGE_SRC))
 from horizon_manager import cli  # noqa: E402
 from horizon_manager.cli import CommandContext, CommandResult  # noqa: E402
 from horizon_manager.interactive import _compact_path, _default_menu_runner, command_feedback_lines, operator_status_lines, render_menu_lines, run_interactive_main  # noqa: E402
+
+ANSI_RE = re.compile(r"\033\[[0-9;?]*[A-Za-z]")
 
 
 def test_menu_lines_match_keyboard_first_surface() -> None:
@@ -40,27 +43,40 @@ def test_default_menu_runner_shows_active_corpus(monkeypatch, capsys) -> None:
     selected = _default_menu_runner(("[x] Exit",), CommandContext(corpus_name="horizon-manager"))
 
     output = capsys.readouterr().out
+    plain = ANSI_RE.sub("", output)
     assert selected == 8
-    assert "Corpus:" in output
-    assert "horizon-manager" in output
-    assert "Horizons:" in output
-    assert "Locks:" in output
-    assert "active=" in output
-    assert "Doctor:" in output
-    assert "Worktree:" in output
-    assert "Next:" in output
-    assert "management/horizons" in output
+    assert "Corpus  :" in plain
+    assert "horizon-manager" in plain
+    assert "Horizons:" in plain
+    assert "Locks   :" in plain
+    assert "active=" in plain
+    assert "Doctor  :" in plain
+    assert "Worktree:" in plain
+    assert "Next    :" in plain
+    assert "management/horizons" in plain
 
 
 def test_operator_status_lines_are_script_friendly(monkeypatch) -> None:
     monkeypatch.setattr("horizon_manager.interactive._dirty_status", lambda context: "clean")
 
     lines = operator_status_lines(CommandContext(corpus_name="horizon-manager"))
+    plain_lines = [ANSI_RE.sub("", line) for line in lines]
 
     assert all("\n" not in line for line in lines)
-    assert any("Corpus:" in line and "horizon-manager" in line for line in lines)
-    assert any("Worktree:" in line and "clean" in line for line in lines)
-    assert any("Next:" in line and "Hook Check" in line for line in lines)
+    assert any("Corpus  :" in line and "horizon-manager" in line for line in plain_lines)
+    assert any("Worktree:" in line and "clean" in line for line in plain_lines)
+    assert any("Next    :" in line and "Hook Check" in line for line in plain_lines)
+
+
+def test_operator_status_values_start_in_fixed_column(monkeypatch) -> None:
+    monkeypatch.setattr("horizon_manager.interactive._dirty_status", lambda context: "clean")
+
+    lines = [ANSI_RE.sub("", line) for line in operator_status_lines(CommandContext(corpus_name="horizon-manager"))]
+    status_rows = [line for line in lines if ":" in line and line.split(":", 1)[0].strip() in {"Corpus", "Horizons", "Locks", "Doctor", "Worktree", "Next"}]
+
+    assert status_rows
+    assert {line.index(":") for line in status_rows} == {8}
+    assert {line.index(":") + 2 for line in status_rows} == {10}
 
 
 def test_compact_path_preserves_tail_for_long_horizon_paths() -> None:
