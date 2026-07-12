@@ -60,6 +60,7 @@ def write_horizon_state(
 def parse_readme(path: str | Path, horizons_dir: str | Path | None = None) -> HorizonRecord:
     source_path = Path(path)
     root = Path(horizons_dir) if horizons_dir is not None else source_path.parents[1]
+    display_root = _display_root(source_path)
     text = source_path.read_text(encoding="utf-8")
     horizon_id = HorizonId(source_path.parent.name)
     warnings: list[ParseWarning] = []
@@ -68,29 +69,29 @@ def parse_readme(path: str | Path, horizons_dir: str | Path | None = None) -> Ho
     status_text = _match_text(_STATUS_RE.search(text))
     status = HorizonStatus.normalize(status_text)
     if not status_text:
-        warnings.append(_warning("missing_status", horizon_id, source_path, "metadata", "missing Status line"))
+        warnings.append(_warning("missing_status", horizon_id, source_path, "metadata", "missing Status line", display_root))
     elif status is HorizonStatus.UNKNOWN:
-        warnings.append(_warning("unknown_status", horizon_id, source_path, "metadata", f"unknown status: {status_text}"))
+        warnings.append(_warning("unknown_status", horizon_id, source_path, "metadata", f"unknown status: {status_text}", display_root))
 
     sections = _scan_sections(text)
     concurrency = sections.get("concurrency", "").strip()
     if not concurrency:
-        warnings.append(_warning("missing_concurrency", horizon_id, source_path, "Concurrency", "missing Concurrency section"))
+        warnings.append(_warning("missing_concurrency", horizon_id, source_path, "Concurrency", "missing Concurrency section", display_root))
 
     wave = _parse_wave(status_text, concurrency, text)
     if wave is None:
-        warnings.append(_warning("missing_wave", horizon_id, source_path, "metadata", "missing Wave marker"))
+        warnings.append(_warning("missing_wave", horizon_id, source_path, "metadata", "missing Wave marker", display_root))
 
     dependencies = _parse_dependencies(horizon_id, status_text, sections, text)
     owned_files = _parse_owned_files(horizon_id, source_path, sections)
     if not any(owned.mode is not OwnedPathMode.READ_ONLY for owned in owned_files):
-        warnings.append(_warning("missing_owned_files", horizon_id, source_path, "Owned Files", "missing writable Owned Files section"))
+        warnings.append(_warning("missing_owned_files", horizon_id, source_path, "Owned Files", "missing writable Owned Files section", display_root))
 
     return HorizonRecord(
         id=horizon_id,
         title=title,
-        directory=_rel(source_path.parent),
-        source_path=_rel(source_path),
+        directory=_rel(source_path.parent, display_root),
+        source_path=_rel(source_path, display_root),
         status=status,
         wave=wave,
         dates=tuple(sorted(set(_DATE_RE.findall(status_text or "")))),
@@ -302,13 +303,23 @@ def _match_text(match: re.Match[str] | None) -> str:
     return match.group(1).strip() if match else ""
 
 
-def _warning(code: str, horizon_id: HorizonId, source_path: Path, section: str, message: str) -> ParseWarning:
-    return ParseWarning(code=code, horizon_id=horizon_id, message=message, source_path=_rel(source_path), section=section)
+def _warning(code: str, horizon_id: HorizonId, source_path: Path, section: str, message: str, root: Path | None = None) -> ParseWarning:
+    return ParseWarning(code=code, horizon_id=horizon_id, message=message, source_path=_rel(source_path, root), section=section)
 
 
-def _rel(path: Path) -> str:
+def _display_root(path: Path) -> Path:
+    resolved = path.resolve()
+    cwd = Path.cwd().resolve()
     try:
-        return str(path.resolve().relative_to(REPO_ROOT))
+        resolved.relative_to(cwd)
+        return cwd
+    except ValueError:
+        return REPO_ROOT
+
+
+def _rel(path: Path, root: Path | None = None) -> str:
+    try:
+        return str(path.resolve().relative_to(root or REPO_ROOT))
     except ValueError:
         return str(path)
 

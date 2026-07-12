@@ -2,10 +2,10 @@
 
 Owner: agent-toolchain
 Source of Truth: management/horizons/H01_External_App_Boundary_And_Packaging/README.md
-Lifecycle: planned
+Lifecycle: completed
 Document Class: horizon
 
-Status: planned (Wave 1).
+Status: implemented (Wave 1).
 
 ## Purpose
 
@@ -31,10 +31,21 @@ Make Horizon Manager explicitly external to any one managed project, with packag
 
 ## Owned Files (EXCLUSIVE)
 
-- `management/subprojects/horizon-manager/pyproject.toml`
-- `management/subprojects/horizon-manager/README.md`
-- `management/subprojects/horizon-manager/src/horizon_manager/__init__.py`
+- `pyproject.toml`
+- `README.md`
+- `src/horizon_manager/__init__.py`
+- `src/horizon_manager/parser.py`
+- `tests/test_horizon_model.py`
 
 ## Concurrency
 
 Wave 1. No upstream horizon dependency.
+
+## Completion Notes
+
+- Package distribution is named `cli-horizons-manager`.
+- Console entry point remains `horizon-manager`.
+- README defines the external application boundary, WSL install flow, selected-corpus
+  runtime path rule, and self-management corpus.
+- Parser source paths are normalized relative to the current standalone checkout when
+  managed horizons live inside this repository.

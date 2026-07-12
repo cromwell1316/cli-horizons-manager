@@ -8,6 +8,11 @@ Document Class: subproject
 Horizon Manager is the external application for reading, validating, coordinating, and
 rendering management horizon corpora. It is not bound to one project checkout.
 
+It is packaged as `cli-horizons-manager` and exposes the `horizon-manager` console
+command. The managed projects remain separate repositories or working trees; this
+application only receives a selected corpus path and writes generated horizon artifacts
+for that selected corpus.
+
 ## Scope
 - List and select configured horizon corpora.
 - Parse horizon README files into canonical state.
@@ -20,11 +25,12 @@ rendering management horizon corpora. It is not bound to one project checkout.
 
 ## Console Interface
 
-The supported local console entry point is `horizon-manager`. Install the editable
-checkout once:
+The supported local console entry point is `horizon-manager`. From a WSL shell, install
+the editable checkout once:
 
 ```bash
-python3 -m pip install --user -e management/subprojects/horizon-manager
+cd ~/projects/shared/GeoForge/management/subprojects/horizon-manager
+python3 -m pip install --user -e .
 ```
 
 Then launch it directly:
@@ -57,23 +63,49 @@ horizon-manager claim H54 --agent manual --dry-run
 horizon-manager hook --mode manual --claim H53
 ```
 
+From Windows, the same checkout is reachable through the WSL UNC path:
+
+```text
+\\wsl.localhost\Ubuntu\home\olivercromwell\projects\shared\GeoForge\management\subprojects\horizon-manager
+```
+
+Run the command itself inside WSL so path expansion, file locks, and generated artifact
+paths use Linux filesystem semantics.
+
 ## Project Layout
-- `pyproject.toml` - package metadata and console entry placeholder.
+- `pyproject.toml` - external package metadata and console entry point.
 - `src/horizon_manager/` - application package.
+- `management/horizons/` - this application's own management horizon corpus.
 - `tests/` - application tests.
 
 ## Managed Corpora
-Configured corpora:
+The default registry includes these corpora for the local operator environment:
 - `hco` -> `~/projects/shared/GeoForge/management/subprojects/hermes-consistency-orchestrator/horizons`
 - `cli-profile-manager` -> `~/projects/shared/cli-profile-manager/management/horizons`
 - `geoforge` -> `~/projects/shared/GeoForge/management/horizons`
 - `horizon-manager` -> `~/projects/shared/GeoForge/management/subprojects/horizon-manager/management/horizons`
 
-Generated outputs are written next to the selected corpus, under its management
-directory or subproject root. Use `horizon-manager corpora` to inspect the active
-registry.
+Generated outputs are written next to the selected corpus, under that corpus'
+management directory or subproject root. Project-specific runtime paths must enter the
+application through one of these mechanisms:
+
+- select a configured corpus with `--corpus`;
+- inspect configured corpora with `horizon-manager corpora`;
+- override an invocation explicitly with `--repo-root`, `--horizons-dir`, or
+  `--generated-dir`.
+
+No managed corpus is treated as the owner of this application.
 
 ## Boundary
 This project owns the manager application code. It reads managed horizon documents and
 writes declared generated outputs only. It must not mutate decisions, contracts, or
 deep-audit detector reports.
+
+The package boundary is:
+
+- application code: `src/horizon_manager/`;
+- CLI entry point: `horizon-manager`;
+- distribution name: `cli-horizons-manager`;
+- self-management corpus: `management/horizons/`;
+- managed-project data: selected only through the corpus registry or explicit CLI path
+  overrides.

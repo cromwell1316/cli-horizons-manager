@@ -15,6 +15,8 @@ Make Horizon Manager explicitly external to any one managed project, with packag
 
 ## Owned Implementation Surface
 
-- management/subprojects/horizon-manager/pyproject.toml
-- management/subprojects/horizon-manager/README.md
-- management/subprojects/horizon-manager/src/horizon_manager/__init__.py
+- pyproject.toml
+- README.md
+- src/horizon_manager/__init__.py
+- src/horizon_manager/parser.py
+- tests/test_horizon_model.py

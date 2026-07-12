@@ -1,4 +1,4 @@
-"""GeoForge Horizon Manager application package."""
+"""External Horizon Manager application package."""
 
 __all__ = ["__version__"]
 

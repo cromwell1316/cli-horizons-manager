@@ -1,12 +1,25 @@
 [project]
-name = "geoforge-horizon-manager"
+name = "cli-horizons-manager"
 version = "0.1.0"
-description = "External horizon management application for GeoForge management subprojects."
+description = "External keyboard-first CLI for managing horizon corpora across projects."
 requires-python = ">=3.11"
 dependencies = []
+readme = "README.md"
+keywords = ["cli", "horizons", "project-management", "coordination"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Software Development",
+]
 
 [project.scripts]
 horizon-manager = "horizon_manager.cli:main"
+
+[project.urls]
+Repository = "https://github.com/cromwell1316/cli-horizons-manager"
 
 [build-system]
 requires = ["setuptools>=68"]

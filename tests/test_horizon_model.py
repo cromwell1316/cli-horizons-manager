@@ -108,6 +108,32 @@ def test_parser_warns_on_missing_optional_sections() -> None:
         assert record.status is HorizonStatus.UNKNOWN
 
 
+def test_parser_uses_current_checkout_for_nested_standalone_paths(monkeypatch) -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        checkout = Path(tmp) / "horizon-manager"
+        root = checkout / "management/horizons"
+        readme = root / "H01_External_App_Boundary" / "README.md"
+        _write(
+            readme,
+            """# HM-H01 External App Boundary
+
+Status: implemented (Wave 1).
+
+## Owned Files (EXCLUSIVE)
+- `README.md`
+
+## Concurrency
+Wave 1.
+""",
+        )
+        monkeypatch.chdir(checkout)
+
+        record = parse_readme(readme, root)
+
+        assert record.directory == "management/horizons/H01_External_App_Boundary"
+        assert record.source_path == "management/horizons/H01_External_App_Boundary/README.md"
+
+
 def test_real_horizon_tree_parses_current_corpus() -> None:
     state = parse_horizon_tree(ROOT / "management/subprojects/hermes-consistency-orchestrator/horizons")
     assert len(state.records) >= 54
