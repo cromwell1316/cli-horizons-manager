@@ -8,10 +8,13 @@ Stop operational artifacts and unrelated corpus files from blocking ordinary Hor
 
 ## Required Properties
 
-- Deterministic CLI and JSON behavior.
+- Deterministic CLI and JSON behavior remains unchanged by this documentation/policy
+  horizon.
 - Corpus-scoped paths and generated outputs where runtime state is involved.
 - Backward compatibility for existing HCO corpus workflows unless explicitly superseded.
 - Clear diagnostics when required input is missing or unsafe.
+- Clear repository policy for generated, detector, graph, and separately landed
+  artifacts.
 
 ## Owned Implementation Surface
 

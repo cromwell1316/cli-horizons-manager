@@ -114,3 +114,33 @@ The package boundary is:
 - self-management corpus: `management/horizons/`;
 - managed-project data: selected only through the corpus registry or explicit CLI path
   overrides.
+
+## Worktree Hygiene
+Normal Horizon Manager commits should contain authored application files, tests,
+documentation, and self-management horizon documents. Runtime output and external
+detector material are treated as operational artifacts unless a horizon explicitly owns
+them.
+
+Tracked by default:
+- package metadata, source code, tests, README files, and horizon phase/verification
+  documents;
+- durable configuration that belongs to this application, such as corpus registry
+  configuration when it is intentionally added;
+- policy documentation that explains operator behavior.
+
+Ignored by default:
+- local Python caches and editable-install metadata;
+- `graphify-out/` knowledge graph output;
+- `deep_audit/` detector output;
+- regenerated `horizon_*.json`, `horizon_*.jsonl`, dashboard/DAG HTML, and
+  `horizon_snapshots/` artifacts at the repo root or under `management/`.
+
+Separately landed:
+- generated artifacts from another managed corpus;
+- deep-audit findings, decisions, contracts, or remediation records;
+- graph refresh output when the task is specifically to update graph artifacts.
+
+Before committing, inspect `git status --short` and stage only files owned by the
+current horizon. If generated output is deliberately part of a scoped task, use an
+explicit force-add and record that exception in the horizon evidence. Unrelated dirty
+files should remain unstaged and be treated as another operator's work.

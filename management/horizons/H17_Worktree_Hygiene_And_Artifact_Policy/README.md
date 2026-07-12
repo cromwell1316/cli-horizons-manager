@@ -2,10 +2,10 @@
 
 Owner: agent-toolchain
 Source of Truth: management/horizons/H17_Worktree_Hygiene_And_Artifact_Policy/README.md
-Lifecycle: planned
+Lifecycle: completed
 Document Class: horizon
 
-Status: planned (Wave 7).
+Status: implemented (Wave 7).
 
 ## Purpose
 
@@ -13,9 +13,12 @@ Stop operational artifacts and unrelated corpus files from blocking ordinary Hor
 
 ## Goals
 
-- Define tracked, ignored, and separately landed artifacts.
+- Define tracked, ignored, and separately landed artifacts. Done in README worktree
+  hygiene policy.
 - Keep graphify-out and deep-audit outputs out of normal app commits unless scoped.
-- Document cleanup and staging discipline.
+  Done in `.gitignore` and README policy.
+- Document cleanup and staging discipline. Done in README policy and validation
+  evidence.
 
 ## Files
 

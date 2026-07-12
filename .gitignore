@@ -2,4 +2,27 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 *.egg-info/
+
+# Local knowledge graphs and detector outputs are operational artifacts.
 graphify-out/
+deep_audit/
+
+# Horizon Manager runtime artifacts are regenerated per selected corpus.
+horizon_state.json
+horizon_conflicts.json
+horizon_doctor.json
+horizon_next.json
+horizon_locks.json
+horizon_events.jsonl
+horizon_dashboard.html
+horizon_dependency_graph.html
+horizon_snapshots/
+management/horizon_state.json
+management/horizon_conflicts.json
+management/horizon_doctor.json
+management/horizon_next.json
+management/horizon_locks.json
+management/horizon_events.jsonl
+management/horizon_dashboard.html
+management/horizon_dependency_graph.html
+management/horizon_snapshots/

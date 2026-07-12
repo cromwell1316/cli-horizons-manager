@@ -10,11 +10,17 @@ Stop operational artifacts and unrelated corpus files from blocking ordinary Hor
 
 Horizon Manager has a clear, testable implementation increment for worktree hygiene and artifact policy.
 
+## Outcome
+
+Completed. The application now documents its worktree hygiene policy and ignores local
+runtime, graph, and detector artifacts that should not enter normal app commits.
+
 ## Success Criteria
 
-- Define tracked, ignored, and separately landed artifacts.
+- Define tracked, ignored, and separately landed artifacts. Complete.
 - Keep graphify-out and deep-audit outputs out of normal app commits unless scoped.
-- Document cleanup and staging discipline.
+  Complete.
+- Document cleanup and staging discipline. Complete.
 
 ## Scope
 

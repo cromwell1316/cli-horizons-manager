@@ -2,15 +2,18 @@
 
 Source of Truth: management/horizons/H17_Worktree_Hygiene_And_Artifact_Policy/README.md
 
-## Current State
+## Baseline State
 
-The current Horizon Manager implementation does not yet fully satisfy this horizon's target behavior. Existing tests may cover adjacent contracts, but this horizon requires focused implementation evidence.
+Before this horizon, `.gitignore` ignored Python caches, editable-install metadata, and
+`graphify-out/`, but it did not document or ignore Horizon Manager runtime artifacts or
+deep-audit detector output.
 
-## Known Gaps
+## Closed Gaps
 
-- The implementation needs corpus-aware behavior where applicable.
-- Operator output must be deterministic and script-friendly.
-- Tests must cover the owned files before the horizon can land.
+- Runtime `horizon_*` files at the repo root and under `management/` are ignored.
+- `deep_audit/` detector output is ignored unless explicitly force-added for a scoped
+  task.
+- README explains tracked, ignored, and separately landed artifact classes.
 
 ## Baseline Checks
 
