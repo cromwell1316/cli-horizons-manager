@@ -4,15 +4,22 @@ Source of Truth: management/horizons/H04_Context_Propagation_Across_Commands/REA
 
 ## Status
 
-Planned. No implementation evidence has been recorded yet.
+Completed. H04 command context propagation is implemented.
 
 ## Commands
 
-- [ ] `horizon-manager --horizons-dir management/horizons state`
-- [ ] `horizon-manager --horizons-dir management/horizons doctor`
-- [ ] Targeted tests for owned files
-- [ ] `python3 -m pytest` when required
+- [x] `python3 -m pytest tests/test_horizon_cli.py`
+- [x] `python3 -m horizon_manager.cli --format json --corpus horizon-manager state`
+- [x] `python3 -m horizon_manager.cli --corpus horizon-manager corpora list`
+- [x] `python3 -m horizon_manager.parser --horizons-dir management/horizons --output /tmp/hm_h04_state.json`
+- [x] `python3 -m horizon_manager.cli --corpus horizon-manager doctor`
+- [x] `python3 -m pytest`
 
 ## Notes
 
-Record final command output summaries and residual risks here when this horizon lands.
+- `CommandContext.to_dict()` exposes selected corpus, repo root, horizons dir,
+  generated dir, and override flags.
+- `run_command` attaches context metadata to every command result, including failures.
+- Text output includes a context line when result metadata is present.
+- CLI tests cover context metadata, explicit path overrides, selected corpus output,
+  and generated-dir propagation for events.

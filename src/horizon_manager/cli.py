@@ -60,9 +60,16 @@ class CommandContext:
     horizons_dir: Path | None = None
     generated_dir: Path | None = None
     now: str = ""
+    repo_root_overridden: bool = field(init=False, default=False)
+    horizons_dir_overridden: bool = field(init=False, default=False)
+    generated_dir_overridden: bool = field(init=False, default=False)
 
     def __post_init__(self) -> None:
         corpus = resolve_corpus(self.corpus_name)
+        self.corpus_name = corpus.name
+        self.repo_root_overridden = self.repo_root is not None
+        self.horizons_dir_overridden = self.horizons_dir is not None
+        self.generated_dir_overridden = self.generated_dir is not None
         if self.repo_root is None:
             self.repo_root = corpus.repo_root
         else:
@@ -79,6 +86,19 @@ class CommandContext:
     def path(self, name: str) -> Path:
         assert self.generated_dir is not None
         return self.generated_dir / name
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "corpus": str(self.corpus_name),
+            "generated_dir": str(self.generated_dir),
+            "horizons_dir": str(self.horizons_dir),
+            "overrides": {
+                "generated_dir": self.generated_dir_overridden,
+                "horizons_dir": self.horizons_dir_overridden,
+                "repo_root": self.repo_root_overridden,
+            },
+            "repo_root": str(self.repo_root),
+        }
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -153,13 +173,13 @@ def run_command(args: argparse.Namespace, io: CommandIO | None = None, context: 
     }
     handler = handlers.get(args.command)
     if handler is None:
-        return CommandResult(False, str(args.command), message="unknown command", exit_code=ExitCode.BAD_INVOCATION)
+        return _with_context(CommandResult(False, str(args.command), message="unknown command", exit_code=ExitCode.BAD_INVOCATION), ctx)
     try:
-        return handler(args, ctx)
+        return _with_context(handler(args, ctx), ctx)
     except ValueError as exc:
-        return CommandResult(False, args.command, message=str(exc), exit_code=ExitCode.VALIDATION_FAILURE)
+        return _with_context(CommandResult(False, args.command, message=str(exc), exit_code=ExitCode.VALIDATION_FAILURE), ctx)
     except Exception as exc:  # pragma: no cover - defensive process boundary
-        return CommandResult(False, args.command, message=str(exc), exit_code=ExitCode.INTERNAL_ERROR)
+        return _with_context(CommandResult(False, args.command, message=str(exc), exit_code=ExitCode.INTERNAL_ERROR), ctx)
 
 
 def emit_result(result: CommandResult, output_format: str = "text", io: CommandIO | None = None) -> None:
@@ -170,6 +190,9 @@ def emit_result(result: CommandResult, output_format: str = "text", io: CommandI
     stream = streams.stdout if result.ok else streams.stderr
     status = "ok" if result.ok else "error"
     print(f"{status}: {result.command}: {result.message or _default_message(result)}", file=stream)
+    context = result.data.get("context")
+    if isinstance(context, dict) and context.get("corpus"):
+        print(f"context: corpus={context['corpus']} horizons_dir={context.get('horizons_dir', '')}", file=stream)
     for diagnostic in result.diagnostics:
         print(f"- {diagnostic}", file=stream)
 
@@ -422,6 +445,19 @@ def _horizon_count(horizons_dir: Path) -> int:
     if not horizons_dir.is_dir():
         return 0
     return sum(1 for _ in horizons_dir.glob("H[0-9][0-9]*/README.md"))
+
+
+def _with_context(result: CommandResult, ctx: CommandContext) -> CommandResult:
+    data = dict(result.data)
+    data.setdefault("context", ctx.to_dict())
+    return CommandResult(
+        result.ok,
+        result.command,
+        data=data,
+        message=result.message,
+        exit_code=result.exit_code,
+        diagnostics=result.diagnostics,
+    )
 
 
 def _context_from_args(args: argparse.Namespace) -> CommandContext:

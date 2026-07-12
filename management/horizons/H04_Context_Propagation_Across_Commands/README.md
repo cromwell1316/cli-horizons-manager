@@ -2,10 +2,10 @@
 
 Owner: agent-toolchain
 Source of Truth: management/horizons/H04_Context_Propagation_Across_Commands/README.md
-Lifecycle: planned
+Lifecycle: completed
 Document Class: horizon
 
-Status: planned (Wave 2).
+Status: implemented (Wave 2).
 
 ## Purpose
 
@@ -31,9 +31,20 @@ Ensure every command runs against the selected corpus context instead of implici
 
 ## Owned Files (EXCLUSIVE)
 
-- `management/subprojects/horizon-manager/src/horizon_manager/cli.py`
-- `management/subprojects/horizon-manager/tests/test_horizon_cli.py`
+- `src/horizon_manager/cli.py`
+- `tests/test_horizon_cli.py`
 
 ## Concurrency
 
 Wave 2. Needs: H02.
+
+## Completion Notes
+
+- `CommandContext` now normalizes the selected corpus and records explicit repo root,
+  horizons dir, and generated dir overrides.
+- Every `run_command` result receives `data.context` with corpus, repo root, horizons
+  dir, generated dir, and override flags.
+- Text output prints the selected corpus and horizons dir when context metadata is
+  present.
+- Locks and events continue to use `CommandContext.path(...)`, preserving generated-dir
+  overrides for scripts.

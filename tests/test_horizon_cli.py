@@ -60,6 +60,14 @@ def test_text_output_uses_stderr_for_failures() -> None:
     assert "- lock:H42" in stderr.getvalue()
 
 
+def test_text_output_includes_context_when_present() -> None:
+    stdout = StringIO()
+    result = CommandResult(True, "state", data={"context": {"corpus": "demo", "horizons_dir": "/tmp/horizons"}}, message="ok")
+    emit_result(result, "text", CommandIO(stdout=stdout, stderr=StringIO()))
+
+    assert "context: corpus=demo horizons_dir=/tmp/horizons" in stdout.getvalue()
+
+
 def test_state_command_parses_temp_horizon_tree() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
@@ -71,7 +79,48 @@ def test_state_command_parses_temp_horizon_tree() -> None:
 
     assert result.ok is True
     assert result.data["horizon_count"] == 1
+    assert result.data["context"]["corpus"] == "hco"
+    assert result.data["context"]["horizons_dir"] == str(horizons)
+    assert result.data["context"]["overrides"]["horizons_dir"] is True
     assert result.exit_code is ExitCode.SUCCESS
+
+
+def test_command_context_records_selected_corpus_and_overrides() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        horizons = root / "custom-horizons"
+        generated = root / "custom-generated"
+        generated.mkdir()
+        _write_readme(horizons, "H01", "Alpha", "implemented", 1, ())
+        args = build_parser().parse_args(
+            [
+                "--corpus",
+                "horizon-manager",
+                "--repo-root",
+                str(root),
+                "--horizons-dir",
+                str(horizons),
+                "--generated-dir",
+                str(generated),
+                "state",
+            ]
+        )
+
+        result = run_command(args)
+
+    context = result.data["context"]
+    assert result.ok is True
+    assert context == {
+        "corpus": "horizon-manager",
+        "generated_dir": str(generated),
+        "horizons_dir": str(horizons),
+        "overrides": {
+            "generated_dir": True,
+            "horizons_dir": True,
+            "repo_root": True,
+        },
+        "repo_root": str(root),
+    }
 
 
 def test_corpora_command_lists_configured_external_corpora() -> None:
@@ -81,6 +130,7 @@ def test_corpora_command_lists_configured_external_corpora() -> None:
 
     assert result.ok is True
     assert result.data["action"] == "list"
+    assert result.data["context"]["corpus"] == "hco"
     names = [row["name"] for row in result.data["corpora"]]
     assert names == ["hco", "cli-profile-manager", "geoforge", "horizon-manager"]
     assert all("horizon_count" in row for row in result.data["corpora"])
@@ -202,7 +252,9 @@ def test_events_command_reads_jsonl_tail() -> None:
         result = run_command(args, context=CommandContext(repo_root=root, generated_dir=root))
 
     assert result.ok is True
-    assert result.data == {"event_count": 2, "events": [{"id": 2}]}
+    assert result.data["event_count"] == 2
+    assert result.data["events"] == [{"id": 2}]
+    assert result.data["context"]["generated_dir"] == str(root)
 
 
 def test_delegated_commands_return_validation_failure_until_modules_land() -> None:
@@ -260,7 +312,9 @@ if __name__ == "__main__":
     test_parser_exposes_required_commands()
     test_json_output_is_deterministic()
     test_text_output_uses_stderr_for_failures()
+    test_text_output_includes_context_when_present()
     test_state_command_parses_temp_horizon_tree()
+    test_command_context_records_selected_corpus_and_overrides()
     test_corpora_command_lists_configured_external_corpora()
     test_corpora_list_action_is_explicit_alias()
     test_corpus_selection_sets_context_paths()

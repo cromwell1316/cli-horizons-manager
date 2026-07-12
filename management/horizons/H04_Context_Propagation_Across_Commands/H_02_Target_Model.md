@@ -15,5 +15,5 @@ Ensure every command runs against the selected corpus context instead of implici
 
 ## Owned Implementation Surface
 
-- management/subprojects/horizon-manager/src/horizon_manager/cli.py
-- management/subprojects/horizon-manager/tests/test_horizon_cli.py
+- src/horizon_manager/cli.py
+- tests/test_horizon_cli.py
